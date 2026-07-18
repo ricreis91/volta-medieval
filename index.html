@@ -15,12 +15,12 @@
         
         <h2 class="text-2xl font-bold text-amber-800 mb-6 uppercase tracking-widest">Sistema VOLTA</h2>
         
-        <form id="login-form" onsubmit="fazerLogin(event)">
+        <form id="login-form" onsubmit="fazerLogin(event)" autocomplete="off">
             <div class="mb-4">
                 <input type="text" id="username" placeholder="Utilizador" required class="w-full p-3 border border-gray-300 rounded focus:ring-2 focus:ring-amber-500 outline-none">
             </div>
             <div class="mb-6">
-                <input type="password" id="password" placeholder="Palavra-passe" required class="w-full p-3 border border-gray-300 rounded focus:ring-2 focus:ring-amber-500 outline-none">
+                <input type="password" id="password" readonly placeholder="Palavra-passe" required class="w-full p-3 border border-gray-300 rounded focus:ring-2 focus:ring-amber-500 outline-none">
             </div>
             
             <p id="erro-msg" class="text-red-500 font-bold mb-4 hidden">Credenciais incorretas!</p>
