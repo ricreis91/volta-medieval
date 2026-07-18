@@ -66,17 +66,23 @@
 
     <!-- MODAL: Confirmação de Lote Parcial -->
     <div id="modal-lote-parcial" class="fixed inset-0 bg-black bg-opacity-70 hidden flex items-center justify-center z-50 no-print">
-        <div class="bg-white p-6 rounded-lg shadow-xl max-w-md w-full text-center border-4 border-yellow-500 modal-content">
-            <h3 class="text-2xl font-bold mb-4 text-yellow-600">Correspondência Parcial</h3>
-            <p class="mb-4">O lote inserido não é exatamente igual, mas os primeiros caracteres coincidem com um lote levantado por esta equipa.</p>
-            <p class="mb-6 font-bold text-lg bg-yellow-100 p-3 rounded text-yellow-800">Lote Sugerido: <span id="modal-parcial-lote-nome" class="font-black"></span></p>
-            <p class="mb-4 text-sm">Aceita processar a devolução utilizando este lote levantado?</p>
-            <div class="flex justify-center gap-3">
-                <button onclick="fecharModais()" class="px-4 py-2 bg-red-500 text-white rounded font-bold hover:bg-red-600">Rejeitar</button>
-                <button onclick="confirmarLoteParcial()" class="px-4 py-2 bg-green-600 text-white rounded font-bold hover:bg-green-700">Aceitar Correspondência</button>
-            </div>
+    <div class="bg-white p-6 rounded-lg shadow-xl max-w-md w-full text-center border-4 border-yellow-500 modal-content">
+        <h3 class="text-2xl font-bold mb-4 text-yellow-600">Lote Não Encontrado</h3>
+        <p class="mb-4">O lote exato inserido não corresponde, mas esta equipa tem os seguintes lotes pendentes.</p>
+        
+        <div class="mb-6">
+            <label class="block text-sm font-bold mb-2 text-gray-700 text-left">Selecione o Lote a Devolver:</label>
+            <select id="modal-dropdown-lotes" class="w-full p-3 border border-yellow-400 rounded focus:ring-2 focus:ring-yellow-500 outline-none font-mono font-bold text-lg text-center bg-yellow-50">
+                <!-- Preenchido via JavaScript -->
+            </select>
+        </div>
+        
+        <div class="flex justify-center gap-3">
+            <button onclick="fecharModais()" class="px-4 py-2 bg-red-500 text-white rounded font-bold hover:bg-red-600">Cancelar</button>
+            <button onclick="confirmarLoteParcial()" class="px-4 py-2 bg-green-600 text-white rounded font-bold hover:bg-green-700 shadow-md">Aceitar Lote Selecionado</button>
         </div>
     </div>
+</div>
 
     <!-- MODAL: Confirmar Edição de Responsável -->
     <div id="modal-confirmar-edicao" class="fixed inset-0 bg-black bg-opacity-70 hidden flex items-center justify-center z-50 no-print">
@@ -826,56 +832,83 @@
                 const movsLevantamento = db.movimentos.filter(m => m.equipaId === equipaId && m.tipo === 'levantamento');
                 const exato = movsLevantamento.find(m => m.lote === loteInserido);
 
-                if (!exato) {
-                   const limit = db.config.tamanhoLoteParcial || 6;
-const parcial = movsLevantamento.find(m => {
-    // Ignora lotes em branco que possam estar no histórico (evita o "campo vazio")
-    if (!m.lote || m.lote.trim() === '') return false;
-    
-    const prefixoGuardado = m.lote.substring(0, limit);
+               if (!exato) {
+    // 1. Calcula o saldo (levantadas - devolvidas) de cada lote para esta equipa
+    const saldosLotes = {};
+    db.movimentos.filter(m => m.equipaId === equipaId).forEach(m => {
+        if (!saldosLotes[m.lote]) saldosLotes[m.lote] = 0;
+        if (m.tipo === 'levantamento') saldosLotes[m.lote] += m.quantidade;
+        if (m.tipo === 'devolucao') saldosLotes[m.lote] -= m.quantidade;
+    });
+
+    // 2. Filtra apenas os lotes que têm garrafas em falta (> 0)
+    const lotesAbertos = Object.keys(saldosLotes).filter(lote => saldosLotes[lote] > 0);
+
+    if (lotesAbertos.length === 0) {
+        alert(`ERRO: Esta equipa não tem garrafas pendentes de NENHUM lote para devolver.`);
+        return;
+    }
+
+    // 3. Constrói a lista da dropdown
+    const selectElement = document.getElementById('modal-dropdown-lotes');
+    selectElement.innerHTML = '';
+    lotesAbertos.forEach(lote => {
+        const qtdPend = saldosLotes[lote];
+        selectElement.innerHTML += `<option value="${lote}">${lote} (${qtdPend} garrafas pendentes)</option>`;
+    });
+
+    // 4. Tenta pré-selecionar o que for mais parecido com o que o utilizador escreveu
+    const limit = db.config.tamanhoLoteParcial || 6;
     const prefixoInserido = loteInserido.substring(0, limit);
-    
-    // Compara se um começa com o outro (resolve o problema de LT123 vs LT12345)
-    return prefixoGuardado.startsWith(prefixoInserido) || prefixoInserido.startsWith(prefixoGuardado);
-});
-                    if (parcial) {
-                        movimentoPendente = { equipaId, tipo, lote: parcial.lote, quantidade, formId: event.target };
-                        document.getElementById('modal-parcial-lote-nome').innerText = parcial.lote;
-                        document.getElementById('modal-lote-parcial').classList.remove('hidden');
-                        return;
-                    } else {
-                        alert(`ERRO: Este responsável não levantou nenhuma garrafa com o lote ${loteInserido} ou que corresponda parcialmente.`);
-                        return;
-                    }
-                }
+    const loteParecido = lotesAbertos.find(l => l.startsWith(prefixoInserido) || prefixoInserido.startsWith(l));
+    if (loteParecido) {
+        selectElement.value = loteParecido;
+    }
+
+    // Passamos os dados para a variável pendente e abrimos o modal com a dropdown
+    movimentoPendente = { equipaId, tipo, quantidade };
+    document.getElementById('modal-lote-parcial').classList.remove('hidden');
+    return;
+}
             }
             abrirModalConfirmacaoMovimento(equipaId, tipo, loteInserido, quantidade, estadoAtual, event.target);
         }
 
         function confirmarLoteParcial() {
-			// 1. Guarda os dados numa variável temporária ANTES de limpar os modais
-    const pendente = { ...movimentoPendente };
-            fecharModais();
-            // 3. Usa os dados guardados ('pendente' em vez de 'movimentoPendente')
+			// Vai buscar o lote que o utilizador escolheu na Dropdown
+    const loteEscolhido = document.getElementById('modal-dropdown-lotes').value;
+    const pendente = { ...movimentoPendente, lote: loteEscolhido }; 
+    
+    fecharModais();
+    
     const estadoAtual = calcularEstadoEquipa(pendente.equipaId, db.movimentos);
-    abrirModalConfirmacaoMovimento(pendente.equipaId, pendente.tipo, pendente.lote, pendente.quantidade, estadoAtual, pendente.formId);
+    abrirModalConfirmacaoMovimento(pendente.equipaId, pendente.tipo, pendente.lote, pendente.quantidade, estadoAtual, null);
 }
 
         function confirmarMovimento() {
             if (!movimentoPendente) return;
-            db.movimentos.push({
-                equipaId: movimentoPendente.equipaId,
-                tipo: movimentoPendente.tipo,
-                lote: movimentoPendente.lote,
-                quantidade: movimentoPendente.quantidade,
-                data: movimentoPendente.data
-            });
-            guardarDB();
-            movimentoPendente.formId.reset();
-            fecharModais();
-            mudarAba('resumo');
-        }
-
+    
+    // 1. Grava no Firebase
+    db.movimentos.push({
+        equipaId: movimentoPendente.equipaId,
+        tipo: movimentoPendente.tipo,
+        lote: movimentoPendente.lote,
+        quantidade: movimentoPendente.quantidade,
+        data: movimentoPendente.data 
+    });
+    
+    guardarDB();
+    
+    // 2. LIMPA OS CAMPOS DO FORMULÁRIO (resolve o bug e a duplicação)
+    const tipo = movimentoPendente.tipo; // 'levantamento' ou 'devolucao'
+    document.getElementById(`lote-${tipo}`).value = '';
+    document.getElementById(`qtd-${tipo}`).value = '';
+    document.getElementById(`equipa-${tipo}`).value = '';
+    
+    // 3. Fecha os modais e volta ao ecrã inicial
+    fecharModais();
+    mudarAba('resumo');
+}
         function atualizarTabela() {
             const tbody = document.getElementById('tabela-resumo');
             tbody.innerHTML = '';
