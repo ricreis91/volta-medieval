@@ -72,8 +72,11 @@
             
             <div class="mb-6">
                 <label class="block text-sm font-bold mb-2 text-gray-700 text-left">Selecione o Lote a Devolver:</label>
-                <select id="modal-dropdown-lotes" class="w-full p-3 border border-yellow-400 rounded focus:ring-2 focus:ring-yellow-500 outline-none font-mono font-bold text-lg text-center bg-yellow-50 text-gray-800">
+                <select id="modal-dropdown-lotes" onchange="validarSelecao() "class="w-full p-3 border border-yellow-400 rounded focus:ring-2 focus:ring-yellow-500 outline-none font-mono font-bold text-lg text-center bg-yellow-50 text-gray-800">
                     <!-- Preenchido via JavaScript -->
+					<button id="btn-aceitar-lote" onclick="confirmarLoteParcial()" disabled class="px-6 py-2 bg-gray-400 text-white rounded font-bold cursor-not-allowed">
+    Confirmar Seleção
+</button>
                 </select>
             </div>
             
@@ -537,7 +540,21 @@
                 document.getElementById('input-tamanho-lote').value = db.config.tamanhoLoteParcial;
             }
         }
-
+		// Função que desbloqueia o botão apenas se algo for selecionado
+function validarSelecao() {
+    const dropdown = document.getElementById('modal-dropdown-lotes');
+    const botao = document.getElementById('btn-aceitar-lote');
+    
+    if (dropdown.value !== "") {
+        botao.disabled = false;
+        botao.classList.remove('bg-gray-400', 'cursor-not-allowed');
+        botao.classList.add('bg-green-600', 'hover:bg-green-700');
+    } else {
+        botao.disabled = true;
+        botao.classList.add('bg-gray-400', 'cursor-not-allowed');
+        botao.classList.remove('bg-green-600', 'hover:bg-green-700');
+    }
+}
         function fecharModais() {
             // 1. Esconde todos os modais
     document.getElementById('modal-lote-parcial').classList.add('hidden');
@@ -826,54 +843,51 @@
         function preRegistarMovimento(event, tipo) {
     event.preventDefault();
     
-    // 1. Limpeza dos dados: Maiúsculas e sem espaços
     const equipaId = parseInt(document.getElementById(`equipa-${tipo}`).value);
     const rawLote = document.getElementById(`lote-${tipo}`).value;
     const loteInserido = rawLote.toUpperCase().replace(/\s+/g, '');
     const quantidade = parseInt(document.getElementById(`qtd-${tipo}`).value);
-    const limit = db.config.tamanhoLoteParcial || 5; // Usa 5 por defeito
+    const limit = db.config.tamanhoLoteParcial || 5;
 
-    // 2. Validação do tamanho mínimo
+    // 1. Validação de tamanho e quantidade mínima
     if (loteInserido.length < limit) {
         alert(`ERRO: O lote deve ter pelo menos ${limit} caracteres.`);
         return;
     }
+    if (isNaN(quantidade) || quantidade <= 0) {
+        alert("ERRO: Insira uma quantidade válida.");
+        return;
+    }
 
     if (tipo === 'devolucao') {
-        const movsLevantamento = db.movimentos.filter(m => m.equipaId === equipaId && m.tipo === 'levantamento');
-        
-        // Verifica se existe um lote exato
-        const exato = movsLevantamento.find(m => m.lote === loteInserido);
-        if (exato) {
-            abrirModalConfirmacaoMovimento(equipaId, tipo, loteInserido, quantidade, calcularEstadoEquipa(equipaId, db.movimentos), event.target);
+        // 2. Calcular o saldo real do lote inserido
+        const movsLote = db.movimentos.filter(m => m.equipaId === equipaId && m.lote === loteInserido);
+        const saldoLote = movsLote.reduce((acc, m) => {
+            return m.tipo === 'levantamento' ? acc + m.quantidade : acc - m.quantidade;
+        }, 0);
+
+        // 3. Bloquear se a devolução for superior ao saldo do lote específico
+        if (quantidade > saldoLote) {
+            alert(`ERRO: Quantidade insuficiente no lote ${loteInserido}.\nDisponível: ${saldoLote} garrafas.`);
             return;
         }
 
-        // 3. Lógica de Parcial vs Rejeição
-        const prefixoInserido = loteInserido.substring(0, limit);
-        
-        // Filtra lotes do histórico que começam com o mesmo prefixo
-        const sugestoes = [...new Set(movsLevantamento.map(m => m.lote))]
-            .filter(l => l.substring(0, limit) === prefixoInserido);
-
-        if (sugestoes.length > 0) {
-            // Se encontrou lotes que batem certo no prefixo, abre a dropdown
-            const saldos = {}; // (Lógica de calcular saldos pendentes aqui)
-            // ... (preenchimento da dropdown igual ao que fizemos antes)
-            
-            const sel = document.getElementById('modal-dropdown-lotes');
-            sel.innerHTML = '';
-            sugestoes.forEach(l => sel.innerHTML += `<option value="${l}">${l}</option>`);
-            
-            movimentoPendente = { equipaId, tipo, quantidade, formId: event.target };
-            document.getElementById('modal-lote-parcial').classList.remove('hidden');
-        } else {
-            // 4. Rejeição imediata se não houver correspondência nenhuma no prefixo
-            alert("ERRO: Lote inválido ou não encontrado para esta equipa.");
-        }
-    } else {
-        // Para levantamentos, segue o processo normal
+        // 4. Se passar a validação, segue o fluxo
         abrirModalConfirmacaoMovimento(equipaId, tipo, loteInserido, quantidade, calcularEstadoEquipa(equipaId, db.movimentos), event.target);
+    } else {
+        // Fluxo normal para levantamentos
+        abrirModalConfirmacaoMovimento(equipaId, tipo, loteInserido, quantidade, calcularEstadoEquipa(equipaId, db.movimentos), event.target);
+    }
+			if (lotesDisponiveis.length > 0) {
+        const sel = document.getElementById('modal-dropdown-lotes');
+        sel.innerHTML = '<option value="">-- SELECIONE UM LOTE --</option>'; // Opção obrigatória
+        lotesDisponiveis.forEach(l => {
+            sel.innerHTML += `<option value="${l}">${l} (${saldos[l]} pendentes)</option>`;
+        });
+        
+        // Reset ao estado do botão
+        document.getElementById('btn-aceitar-lote').disabled = true;
+        // ... (resto da lógica)
     }
 }
 
