@@ -534,8 +534,8 @@
         if (modoEscuroAtivo) aplicarModoEscuroVisual();
 
         function mudarAba(abaId) {
-            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-            document.getElementById(abaId).classList.add('active');
+document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+    document.getElementById(abaId).classList.add('active');
             
             if (abaId === 'resumo') atualizarTabela();
             if (abaId === 'historico') atualizarHistorico();
