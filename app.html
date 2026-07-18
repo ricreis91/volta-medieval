@@ -516,26 +516,19 @@
         });
 
         // Função para Escrever na Base de Dados do Firebase (Substitui LocalStorage)
-    function guardarDB() {
-    // 1. Guarda
-    localStorage.setItem('dados_volta', JSON.stringify(db));
-    
-    // 2. Atualiza a vista se existir
-    if (typeof atualizarHistorico === 'function') {
-        atualizarHistorico();
-    }
-    if (typeof atualizarTabela === 'function') {
-        atualizarTabela();
-    }
-    console.log("DB guardada e vistas atualizadas.");
-}
+        function guardarDB() {
+            set(ref(database, 'voltaDB'), db).catch((error) => {
+                console.error("Erro ao guardar na base de dados:", error);
+                alert("Erro ao guardar os dados. Verifique a sua ligação.");
+            });
+        }
 
         let modoEscuroAtivo = localStorage.getItem('voltaTemaEscuro') === 'true';
         if (modoEscuroAtivo) aplicarModoEscuroVisual();
 
         function mudarAba(abaId) {
-document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-    document.getElementById(abaId).classList.add('active');
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.getElementById(abaId).classList.add('active');
             
             if (abaId === 'resumo') atualizarTabela();
             if (abaId === 'historico') atualizarHistorico();
@@ -544,24 +537,9 @@ document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('act
                 document.getElementById('input-tamanho-lote').value = db.config.tamanhoLoteParcial;
             }
         }
-function carregarDB() {
-    const dados = localStorage.getItem('dados_volta');
-    if (dados) {
-        db = JSON.parse(dados);
-    } else {
-        db = { movimentos: [], config: { tamanhoLoteParcial: 5 } };
-    }
-}
+
         function fecharModais() {
-            // 1. Esconde todos os modais
-    document.getElementById('modal-lote-parcial').classList.add('hidden');
-    
-    // Se tiveres outros modais (ex: confirmação final), esconde-os também:
-    // document.getElementById('modal-confirmacao').classList.add('hidden');
-    
-    // 2. IMPORTANTE: Limpa a variável pendente para que nada fique "preso"
-    movimentoPendente = null;
-			document.querySelectorAll('[id^="modal-"]').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('[id^="modal-"]').forEach(el => el.classList.add('hidden'));
             movimentoPendente = null;
             edicaoResponsavelPendente = null;
             remocaoResponsavelPendente = null;
@@ -838,58 +816,70 @@ function carregarDB() {
         }
 
         function preRegistarMovimento(event, tipo) {
-    event.preventDefault();
-    
-    // 1. Limpeza dos dados: Maiúsculas e sem espaços
-    const equipaId = parseInt(document.getElementById(`equipa-${tipo}`).value);
-    const rawLote = document.getElementById(`lote-${tipo}`).value;
-    const loteInserido = rawLote.toUpperCase().replace(/\s+/g, '');
-    const quantidade = parseInt(document.getElementById(`qtd-${tipo}`).value);
-    const limit = db.config.tamanhoLoteParcial || 5; // Usa 5 por defeito
-
-    // 2. Validação do tamanho mínimo
-    if (loteInserido.length < limit) {
-        alert(`ERRO: O lote deve ter pelo menos ${limit} caracteres.`);
-        return;
-    }
-
-    if (tipo === 'devolucao') {
-        const movsLevantamento = db.movimentos.filter(m => m.equipaId === equipaId && m.tipo === 'levantamento');
-        
-        // Verifica se existe um lote exato
-        const exato = movsLevantamento.find(m => m.lote === loteInserido);
-        if (exato) {
-            abrirModalConfirmacaoMovimento(equipaId, tipo, loteInserido, quantidade, calcularEstadoEquipa(equipaId, db.movimentos), event.target);
-            return;
-        }
-
-        // 3. Lógica de Parcial vs Rejeição
-        const prefixoInserido = loteInserido.substring(0, limit);
-        
-        // Filtra lotes do histórico que começam com o mesmo prefixo
-        const sugestoes = [...new Set(movsLevantamento.map(m => m.lote))]
-            .filter(l => l.substring(0, limit) === prefixoInserido);
-
-        if (sugestoes.length > 0) {
-            // Se encontrou lotes que batem certo no prefixo, abre a dropdown
-            const saldos = {}; // (Lógica de calcular saldos pendentes aqui)
-            // ... (preenchimento da dropdown igual ao que fizemos antes)
+            event.preventDefault();
             
-            const sel = document.getElementById('modal-dropdown-lotes');
-            sel.innerHTML = '';
-            sugestoes.forEach(l => sel.innerHTML += `<option value="${l}">${l}</option>`);
-            
-            movimentoPendente = { equipaId, tipo, quantidade, formId: event.target };
-            document.getElementById('modal-lote-parcial').classList.remove('hidden');
-        } else {
-            // 4. Rejeição imediata se não houver correspondência nenhuma no prefixo
-            alert("ERRO: Lote inválido ou não encontrado para esta equipa.");
+            const equipaId = parseInt(document.getElementById(`equipa-${tipo}`).value);
+            const loteInserido = document.getElementById(`lote-${tipo}`).value.toUpperCase().replace(/\s+/g, '');
+            const quantidade = parseInt(document.getElementById(`qtd-${tipo}`).value);
+            const estadoAtual = calcularEstadoEquipa(equipaId, db.movimentos);
+
+            if (tipo === 'devolucao') {
+                if (quantidade > estadoAtual.emFalta) {
+                    alert(`ERRO: A equipa tem apenas ${estadoAtual.emFalta} garrafas.\nNão é possível registar uma devolução de ${quantidade}.`);
+                    return;
+                }
+
+                const movsLevantamento = db.movimentos.filter(m => m.equipaId === equipaId && m.tipo === 'levantamento');
+                const exato = movsLevantamento.find(m => m.lote === loteInserido);
+
+                if (!exato) {
+                    // 1. Calcula o saldo de cada lote
+                    const saldosLotes = {};
+                    db.movimentos.filter(m => m.equipaId === equipaId).forEach(m => {
+                        // Ignora lotes corrompidos/em branco do histórico
+                        if (!m.lote || m.lote.trim() === '') return; 
+                        
+                        if (!saldosLotes[m.lote]) saldosLotes[m.lote] = 0;
+                        if (m.tipo === 'levantamento') saldosLotes[m.lote] += m.quantidade;
+                        if (m.tipo === 'devolucao') saldosLotes[m.lote] -= m.quantidade;
+                    });
+
+                    // 2. Filtra lotes com garrafas pendentes
+                    const lotesAbertos = Object.keys(saldosLotes).filter(lote => saldosLotes[lote] > 0);
+
+                    if (lotesAbertos.length === 0) {
+                        alert(`ERRO: Esta equipa não tem garrafas pendentes de NENHUM lote para devolver.`);
+                        return;
+                    }
+
+                    // 3. Preenche a Dropdown
+                    const selectElement = document.getElementById('modal-dropdown-lotes');
+                    if (!selectElement) {
+                        alert("Erro: O HTML do modal novo não está a ser carregado. Faça Ctrl+F5 no navegador.");
+                        return;
+                    }
+                    
+                    selectElement.innerHTML = '';
+                    lotesAbertos.forEach(lote => {
+                        const qtdPend = saldosLotes[lote];
+                        selectElement.innerHTML += `<option value="${lote}">${lote} (${qtdPend} garrafas pendentes)</option>`;
+                    });
+
+                    // 4. Seleciona o mais parecido
+                    const limit = db.config.tamanhoLoteParcial || 6;
+                    const prefixoInserido = loteInserido.substring(0, limit);
+                    const loteParecido = lotesAbertos.find(l => l.startsWith(prefixoInserido) || prefixoInserido.startsWith(l));
+                    if (loteParecido) {
+                        selectElement.value = loteParecido;
+                    }
+
+                    movimentoPendente = { equipaId, tipo, quantidade, formId: event.target };
+                    document.getElementById('modal-lote-parcial').classList.remove('hidden');
+                    return;
+                }
+            }
+            abrirModalConfirmacaoMovimento(equipaId, tipo, loteInserido, quantidade, estadoAtual, event.target);
         }
-    } else {
-        // Para levantamentos, segue o processo normal
-        abrirModalConfirmacaoMovimento(equipaId, tipo, loteInserido, quantidade, calcularEstadoEquipa(equipaId, db.movimentos), event.target);
-    }
-}
 
         function confirmarLoteParcial() {
 			// Vai buscar o lote que o utilizador escolheu na Dropdown
@@ -946,41 +936,37 @@ function carregarDB() {
         }
 
         function atualizarHistorico() {
-    const tbody = document.getElementById('tabela-historico');
-    if (!tbody) return; // Se não encontrar o tbody, sai logo
-    
-    tbody.innerHTML = ''; // Limpa a tabela
-    
-    // Verifica se a base de dados tem movimentos
-    if (!db.movimentos || db.movimentos.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center">Nenhum movimento registado.</td></tr>';
-        return;
-    }
+            const tbody = document.getElementById('tabela-historico');
+            tbody.innerHTML = '';
+            const filtroEquipa = document.getElementById('filtro-historico').value;
+            
+            let movsFiltrados = [...db.movimentos];
+            if (filtroEquipa) movsFiltrados = movsFiltrados.filter(m => m.equipaId.toString() === filtroEquipa);
 
-   db.movimentos.forEach((mov) => {
-    // 1. Encontrar a equipa para obter o plafond
-    const equipaObj = db.equipas.find(e => e.id === mov.equipaId);
-    const plafond = equipaObj ? equipaObj.plafond : 0;
-    
-    // 2. Determinar se houve reembolso
-    // O reembolso só ocorre se for devolução (tipo) E a quantidade for > plafond
-    let valorReembolso = 0;
-    if (mov.tipo === 'devolucao' && mov.quantidade > plafond) {
-        valorReembolso = mov.quantidade - plafond; // Ou o cálculo que definir
-    }
+            const movimentosOrdenados = movsFiltrados.sort((a, b) => new Date(b.data) - new Date(a.data));
+            
+            if (movimentosOrdenados.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-gray-500 italic">Nenhum movimento encontrado.</td></tr>';
+                return;
+            }
 
-    // 3. Gerar a linha da tabela
-    const row = document.createElement('tr');
-    row.innerHTML = `
-        <td>${mov.data}</td>
-        <td>${equipaObj ? equipaObj.nome : 'Desconhecido'}</td>
-        <td>${mov.tipo}</td>
-        <td>${mov.quantidade}</td>
-        <td>${valorReembolso > 0 ? valorReembolso : '-'}</td>
-    `;
-    tbody.appendChild(row);
-});
-}
+            movimentosOrdenados.forEach(mov => {
+                const equipa = db.equipas.find(e => e.id === mov.equipaId)?.nome || '<span class="text-red-500 italic">Apagado</span>';
+                const dataFormatada = new Date(mov.data).toLocaleString('pt-PT');
+                const badgeTipo = mov.tipo === 'levantamento' 
+                    ? '<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-bold uppercase tracking-wider">Levantamento</span>'
+                    : '<span class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-bold uppercase tracking-wider">Devolução</span>';
+                tbody.innerHTML += `
+                    <tr class="border-b transition">
+                        <td class="p-3 text-sm text-gray-500">${dataFormatada}</td>
+                        <td class="p-3 font-bold text-gray-800">${equipa}</td>
+                        <td class="p-3 text-center">${badgeTipo}</td>
+                        <td class="p-3 text-center"><span class="font-mono bg-gray-200 text-gray-800 px-2 py-1 rounded text-sm shadow-inner">${mov.lote}</span></td>
+                        <td class="p-3 text-center font-bold text-lg">${mov.quantidade}</td>
+                    </tr>
+                `;
+            });
+        }
 
         function exportarExcel() {
             let csvContent = "data:text/csv;charset=utf-8,\uFEFFData e Hora;Responsável;Tipo;Lote;Quantidade\n";
