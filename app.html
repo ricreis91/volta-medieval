@@ -957,41 +957,29 @@ function carregarDB() {
         return;
     }
 
-    db.movimentos.forEach(mov => {
-        try {
-            // Garante que temos dados mínimos antes de tentar escrever
-            const equipaObj = db.equipas.find(e => e.id === mov.equipaId);
-const equipa = equipaObj ? equipaObj.nome : "Desconhecido";
-            const dataFormatada = mov.data ? new Date(mov.data).toLocaleDateString() : "-";
-            const lote = mov.lote || "S/LOTE";
-            const tipo = mov.tipo || "erro";
-            
-            // Cálculos seguros (evita crashes se o valor for undefined)
-            const qtd = parseInt(mov.quantidade) || 0;
-            const valorCaucao = 0.10; // Valor definido
-            const total = (mov.tipo === 'devolucao') ? (qtd * valorCaucao).toFixed(2) : "0.00";
-            
-            const badgeTipo = tipo === 'devolucao' 
-                ? '<span class="bg-red-100 text-red-800 px-2 py-1 rounded text-xs font-bold">DEVOLUÇÃO</span>' 
-                : '<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-bold">LEVANTAMENTO</span>';
+   db.movimentos.forEach((mov) => {
+    // 1. Encontrar a equipa para obter o plafond
+    const equipaObj = db.equipas.find(e => e.id === mov.equipaId);
+    const plafond = equipaObj ? equipaObj.plafond : 0;
+    
+    // 2. Determinar se houve reembolso
+    // O reembolso só ocorre se for devolução (tipo) E a quantidade for > plafond
+    let valorReembolso = 0;
+    if (mov.tipo === 'devolucao' && mov.quantidade > plafond) {
+        valorReembolso = mov.quantidade - plafond; // Ou o cálculo que definir
+    }
 
-            tbody.innerHTML += `
-                <tr class="border-b">
-                    <td class="p-3 text-sm">${dataFormatada}</td>
-                    <td class="p-3 font-bold">${equipa}</td>
-                    <td class="p-3 text-center">${badgeTipo}</td>
-                    <td class="p-3 text-center"><span class="font-mono bg-gray-100 px-2 rounded">${lote}</span></td>
-                    <td class="p-3 text-center font-bold">
-                        ${qtd}
-                        ${mov.tipo === 'devolucao' ? `<div class="text-[10px] text-green-600">Reembolso: ${total}€</div>` : ''}
-                    </td>
-                </tr>
-            `;
-        } catch (e) {
-            console.error("Erro ao desenhar uma linha do histórico:", e);
-            // Continua o loop mesmo que uma linha falhe
-        }
-    });
+    // 3. Gerar a linha da tabela
+    const row = document.createElement('tr');
+    row.innerHTML = `
+        <td>${mov.data}</td>
+        <td>${equipaObj ? equipaObj.nome : 'Desconhecido'}</td>
+        <td>${mov.tipo}</td>
+        <td>${mov.quantidade}</td>
+        <td>${valorReembolso > 0 ? valorReembolso : '-'}</td>
+    `;
+    tbody.appendChild(row);
+});
 }
 
         function exportarExcel() {
