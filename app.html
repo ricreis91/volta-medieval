@@ -946,7 +946,7 @@ function carregarDB() {
         }
 
         function atualizarHistorico() {
-    const tbody = document.getElementById('historico-body');
+    const tbody = document.getElementById('tabela-historico');
     if (!tbody) return; // Se não encontrar o tbody, sai logo
     
     tbody.innerHTML = ''; // Limpa a tabela
@@ -960,7 +960,8 @@ function carregarDB() {
     db.movimentos.forEach(mov => {
         try {
             // Garante que temos dados mínimos antes de tentar escrever
-            const equipa = mov.equipaId || "Desconhecido";
+            const equipaObj = db.equipas.find(e => e.id === mov.equipaId);
+const equipa = equipaObj ? equipaObj.nome : "Desconhecido";
             const dataFormatada = mov.data ? new Date(mov.data).toLocaleDateString() : "-";
             const lote = mov.lote || "S/LOTE";
             const tipo = mov.tipo || "erro";
