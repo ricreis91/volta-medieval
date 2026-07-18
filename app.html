@@ -517,17 +517,17 @@
 
         // Função para Escrever na Base de Dados do Firebase (Substitui LocalStorage)
     function guardarDB() {
-    try {
-        // Garante que a base de dados não tem valores 'undefined' ou 'null' antes de salvar
-        const dbLimpa = JSON.stringify(db, (key, value) => {
-            return (value === undefined || value === null) ? "" : value;
-        });
-        localStorage.setItem('dados_volta', dbLimpa);
-        console.log("Dados guardados com sucesso!");
-    } catch (e) {
-        console.error("Erro fatal ao guardar base de dados:", e);
-        alert("Erro ao guardar dados. O formato pode estar inválido.");
+    // 1. Guarda
+    localStorage.setItem('dados_volta', JSON.stringify(db));
+    
+    // 2. Atualiza a vista se existir
+    if (typeof atualizarHistorico === 'function') {
+        atualizarHistorico();
     }
+    if (typeof atualizarTabela === 'function') {
+        atualizarTabela();
+    }
+    console.log("DB guardada e vistas atualizadas.");
 }
 
         let modoEscuroAtivo = localStorage.getItem('voltaTemaEscuro') === 'true';
@@ -544,7 +544,14 @@
                 document.getElementById('input-tamanho-lote').value = db.config.tamanhoLoteParcial;
             }
         }
-
+function carregarDB() {
+    const dados = localStorage.getItem('dados_volta');
+    if (dados) {
+        db = JSON.parse(dados);
+    } else {
+        db = { movimentos: [], config: { tamanhoLoteParcial: 5 } };
+    }
+}
         function fecharModais() {
             // 1. Esconde todos os modais
     document.getElementById('modal-lote-parcial').classList.add('hidden');
