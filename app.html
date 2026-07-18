@@ -846,49 +846,48 @@ function validarSelecao() {
     const equipaId = parseInt(document.getElementById(`equipa-${tipo}`).value);
     const rawLote = document.getElementById(`lote-${tipo}`).value;
     const loteInserido = rawLote.toUpperCase().replace(/\s+/g, '');
-    const quantidade = parseInt(document.getElementById(`qtd-${tipo}`).value);
+    const quantidadeDevolucao = parseInt(document.getElementById(`qtd-${tipo}`).value);
     const limit = db.config.tamanhoLoteParcial || 5;
 
-    // 1. Validação de tamanho e quantidade mínima
+    // Validações básicas
     if (loteInserido.length < limit) {
         alert(`ERRO: O lote deve ter pelo menos ${limit} caracteres.`);
         return;
     }
-    if (isNaN(quantidade) || quantidade <= 0) {
-        alert("ERRO: Insira uma quantidade válida.");
-        return;
-    }
 
     if (tipo === 'devolucao') {
-        // 2. Calcular o saldo real do lote inserido
-        const movsLote = db.movimentos.filter(m => m.equipaId === equipaId && m.lote === loteInserido);
-        const saldoLote = movsLote.reduce((acc, m) => {
-            return m.tipo === 'levantamento' ? acc + m.quantidade : acc - m.quantidade;
-        }, 0);
+        // 1. Calcular o saldo TOTAL levantado pela equipa (em todos os lotes)
+        const totalLevantadoGeral = db.movimentos
+            .filter(m => m.equipaId === equipaId && m.tipo === 'levantamento')
+            .reduce((acc, m) => acc + m.quantidade, 0);
+            
+        const totalDevolvidoGeral = db.movimentos
+            .filter(m => m.equipaId === equipaId && m.tipo === 'devolucao')
+            .reduce((acc, m) => acc + m.quantidade, 0);
+            
+        const saldoGeralDisponivel = totalLevantadoGeral - totalDevolvidoGeral;
 
-        // 3. Bloquear se a devolução for superior ao saldo do lote específico
-        if (quantidade > saldoLote) {
-            alert(`ERRO: Quantidade insuficiente no lote ${loteInserido}.\nDisponível: ${saldoLote} garrafas.`);
+        // 2. Calcular o saldo específico deste LOTE
+        const movsEsteLote = db.movimentos.filter(m => m.equipaId === equipaId && m.lote === loteInserido);
+        const totalLevantadoLote = movsEsteLote.filter(m => m.tipo === 'levantamento').reduce((acc, m) => acc + m.quantidade, 0);
+        const totalDevolvidoLote = movsEsteLote.filter(m => m.tipo === 'devolucao').reduce((acc, m) => acc + m.quantidade, 0);
+        const saldoLoteDisponivel = totalLevantadoLote - totalDevolvidoLote;
+
+        // VERIFICAÇÃO 1: Não podes devolver mais do que o total que a equipa tem em posse (global)
+        if (quantidadeDevolucao > saldoGeralDisponivel) {
+            alert(`ERRO: A equipa só tem ${saldoGeralDisponivel} garrafas no total para devolver!`);
             return;
         }
 
-        // 4. Se passar a validação, segue o fluxo
-        abrirModalConfirmacaoMovimento(equipaId, tipo, loteInserido, quantidade, calcularEstadoEquipa(equipaId, db.movimentos), event.target);
-    } else {
-        // Fluxo normal para levantamentos
-        abrirModalConfirmacaoMovimento(equipaId, tipo, loteInserido, quantidade, calcularEstadoEquipa(equipaId, db.movimentos), event.target);
+        // VERIFICAÇÃO 2: Não podes devolver mais do que o que levantaste especificamente deste lote
+        if (quantidadeDevolucao > saldoLoteDisponivel) {
+            alert(`ERRO: Quantidade insuficiente neste lote (${loteInserido}).\nApenas levantou ${totalLevantadoLote} e já devolveu ${totalDevolvidoLote}. Disponível: ${saldoLoteDisponivel}.`);
+            return;
+        }
     }
-			if (lotesDisponiveis.length > 0) {
-        const sel = document.getElementById('modal-dropdown-lotes');
-        sel.innerHTML = '<option value="">-- SELECIONE UM LOTE --</option>'; // Opção obrigatória
-        lotesDisponiveis.forEach(l => {
-            sel.innerHTML += `<option value="${l}">${l} (${saldos[l]} pendentes)</option>`;
-        });
-        
-        // Reset ao estado do botão
-        document.getElementById('btn-aceitar-lote').disabled = true;
-        // ... (resto da lógica)
-    }
+
+    // Se passar nas verificações, segue para o modal de confirmação
+    abrirModalConfirmacaoMovimento(equipaId, tipo, loteInserido, quantidadeDevolucao, calcularEstadoEquipa(equipaId, db.movimentos), event.target);
 }
 
         function confirmarLoteParcial() {
