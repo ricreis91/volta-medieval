@@ -539,7 +539,15 @@
         }
 
         function fecharModais() {
-            document.querySelectorAll('[id^="modal-"]').forEach(el => el.classList.add('hidden'));
+            // 1. Esconde todos os modais
+    document.getElementById('modal-lote-parcial').classList.add('hidden');
+    
+    // Se tiveres outros modais (ex: confirmação final), esconde-os também:
+    // document.getElementById('modal-confirmacao').classList.add('hidden');
+    
+    // 2. IMPORTANTE: Limpa a variável pendente para que nada fique "preso"
+    movimentoPendente = null;
+			document.querySelectorAll('[id^="modal-"]').forEach(el => el.classList.add('hidden'));
             movimentoPendente = null;
             edicaoResponsavelPendente = null;
             remocaoResponsavelPendente = null;
