@@ -134,63 +134,71 @@
 
     </div>
 
-    <!-- SCRIPT DE LIGAÇÃO AO FIREBASE -->
-    <script type="module">
-        // 1. IMPORTA AS FERRAMENTAS DO FIREBASE
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-        import { getDatabase, ref, onValue, set } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+   <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getDatabase, ref, onValue, set } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
-        // 2. CONFIGURAÇÃO DO FIREBASE (Código que recebeste do Google)
-        const firebaseConfig = {
-            apiKey: "AIzaSyCe0YsnIhDJ5a4EKFNgeg_rZDdQssXV1V0",
-            authDomain: "volta-medieval.firebaseapp.com",
-            databaseURL: "https://volta-medieval-default-rtdb.europe-west1.firebasedatabase.app",
-            projectId: "volta-medieval",
-            storageBucket: "volta-medieval.firebasestorage.app",
-            messagingSenderId: "749235714483",
-            appId: "1:749235714483:web:7ffcfce182dea4eaadb3c6"
-        };
+    const firebaseConfig = {
+        apiKey: "AIzaSyCe0YsnIhDJ5a4EKFNgeg_rZDdQssXV1V0",
+        authDomain: "volta-medieval.firebaseapp.com",
+        databaseURL: "https://volta-medieval-default-rtdb.europe-west1.firebasedatabase.app",
+        projectId: "volta-medieval",
+        storageBucket: "volta-medieval.firebasestorage.app",
+        messagingSenderId: "749235714483",
+        appId: "1:749235714483:web:7ffcfce182dea4eaadb3c6"
+    };
 
-        // INICIALIZA O FIREBASE
-        const app = initializeApp(firebaseConfig);
-        const dbFirebase = getDatabase(app);
+    const app = initializeApp(firebaseConfig);
+    const dbFirebase = getDatabase(app);
 
-        const PRECO_CAUCAO = 0.10;
-        
-        // Objeto de dados local (sincronizado com a cloud)
-        window.db = {
-            equipas: [], 
-            movimentos: [], 
-            config: { tamanhoLoteParcial: 6, passwordAdmin: 'viagem' }
-        };
+    window.db = { equipas: [], movimentos: [], config: { tamanhoLoteParcial: 6, passwordAdmin: 'viagem' } };
 
-        // FUNÇÃO QUE ENVIA PARA A CLOUD
-        window.guardarDB = function() {
-            set(ref(dbFirebase, '/'), window.db).catch(error => alert("Erro ao guardar na nuvem: " + error));
-        };
+    window.guardarDB = function() {
+        set(ref(dbFirebase, '/'), window.db);
+    };
 
-        // ESCUTAR ALTERAÇÕES NA CLOUD EM TEMPO REAL
-        onValue(ref(dbFirebase, '/'), (snapshot) => {
-            const data = snapshot.val();
-            if (data) {
-                window.db.equipas = data.equipas || [];
-                window.db.movimentos = data.movimentos || [];
-                window.db.config = data.config || { tamanhoLoteParcial: 6, passwordAdmin: 'viagem' };
-            } else {
-                // Primeira vez a correr: cria a estrutura básica online
-                window.guardarDB();
-            }
-            
-            // Atualiza o ecrã
-            document.getElementById('loading-overlay').style.display = 'none';
-            if(typeof carregarSelects === 'function') carregarSelects();
-            if(typeof atualizarTabela === 'function') atualizarTabela();
-            if(typeof atualizarHistorico === 'function') atualizarHistorico();
-            if(typeof carregarTabelaDefinicoes === 'function') carregarTabelaDefinicoes();
-        }, (error) => {
-            document.getElementById('status-conexao').innerText = "🔴 Offline / Erro de Ligação";
-            document.getElementById('status-conexao').classList.replace('text-green-600', 'text-red-600');
+    // --- FUNÇÕES GLOBAIS ---
+    window.mudarAba = function(abaId) {
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+        document.getElementById(abaId).classList.add('active');
+        if (abaId === 'resumo') window.atualizarTabela();
+        if (abaId === 'historico') window.atualizarHistorico();
+        if (abaId === 'definicoes') window.carregarTabelaDefinicoes();
+    };
+
+    window.carregarSelects = function() {
+        let options = '<option value="">Selecione um responsável...</option>';
+        window.db.equipas.forEach(eq => options += `<option value="${eq.id}">${eq.nome}</option>`);
+        if(document.getElementById('equipa-levantamento')) document.getElementById('equipa-levantamento').innerHTML = options;
+        if(document.getElementById('equipa-devolucao')) document.getElementById('equipa-devolucao').innerHTML = options;
+    };
+
+    window.atualizarTabela = function() {
+        const tbody = document.getElementById('tabela-resumo');
+        if(!tbody) return;
+        tbody.innerHTML = '';
+        window.db.equipas.forEach(equipa => {
+            // ... (coloca aqui a tua lógica de calcularEstadoEquipa) ...
+            tbody.innerHTML += `<tr><td>${equipa.nome}</td></tr>`; // Exemplo simplificado
         });
-    </script>
+    };
+
+    window.atualizarHistorico = function() { /* ... tua lógica ... */ };
+    window.carregarTabelaDefinicoes = function() { /* ... tua lógica ... */ };
+    window.fecharModais = function() { document.querySelectorAll('[id^="modal-"]').forEach(el => el.classList.add('hidden')); };
+
+    // --- ESCUTA DA CLOUD ---
+    onValue(ref(dbFirebase, '/'), (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+            window.db.equipas = data.equipas || [];
+            window.db.movimentos = data.movimentos || [];
+            window.db.config = data.config || window.db.config;
+        }
+        document.getElementById('loading-overlay').style.display = 'none';
+        window.carregarSelects();
+        window.atualizarTabela();
+    });
+</script>
 </body>
 </html>
