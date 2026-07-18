@@ -939,11 +939,7 @@ function validarSelecao() {
                         <td class="p-3 text-center font-bold text-lg">${estado.emFalta}</td>
                         <td class="p-3 text-center font-bold text-red-600 bg-red-50 bg-opacity-50">${estado.caucaoPaga.toFixed(2)}€</td>
                         <td class="p-3 text-center font-bold text-green-600 bg-green-50 bg-opacity-50">${estado.caucaoADevolver.toFixed(2)}€</td>
-						// Na linha da tabela de resumo:
-<td class="p-3 text-center font-bold ${estado.caucaoADevolver > 0 ? 'text-green-800 bg-green-100' : 'text-gray-400'}">
-    ${estado.caucaoADevolver > 0 ? '✅ ' : ''}${estado.caucaoADevolver.toFixed(2)}€
-</td>
-                    </tr>
+						                    </tr>
                 `;
             });
         }
