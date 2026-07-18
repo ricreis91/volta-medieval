@@ -3,48 +3,48 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - Sistema VOLTA</title>
+    <title>Login - Viagem Medieval</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-amber-50 h-screen flex items-center justify-center font-sans">
 
-    <div class="bg-white p-8 rounded-lg shadow-xl max-w-md w-full border-t-8 border-amber-700 text-center">
-        <!-- Logotipos -->
-        <div class="flex justify-center items-center gap-6 mb-8">
-            <img src="logotipo viagem medieval (2).jpg" alt="Viagem Medieval" class="h-40 object-contain">
-            <img src="logo-volta.jpg" alt="VOLTA" class="h-28 object-contain rounded-full">
+    <div class="bg-white p-8 rounded-lg shadow-xl max-w-sm w-full border-t-8 border-amber-700 text-center">
+        <div class="flex justify-center mb-6">
+            <img src="logo-volta.jpg" alt="Logotipo VOLTA" class="h-24 object-contain rounded-full border-2 border-amber-200" onerror="this.style.display='none'">
         </div>
-
-        <h1 class="text-2xl font-bold text-gray-800 mb-6 uppercase tracking-widest">Acesso ao Sistema</h1>
-
-        <form id="form-login" class="space-y-4">
-            <div>
-                <input type="text" id="user" placeholder="Utilizador" class="w-full p-3 border rounded focus:ring-2 focus:ring-amber-500 outline-none text-center" required>
+        
+        <h2 class="text-2xl font-bold text-amber-800 mb-6 uppercase tracking-widest">Sistema VOLTA</h2>
+        
+        <form id="login-form" onsubmit="fazerLogin(event)">
+            <div class="mb-4">
+                <input type="text" id="username" placeholder="Utilizador" required class="w-full p-3 border border-gray-300 rounded focus:ring-2 focus:ring-amber-500 outline-none">
             </div>
-            <div>
-                <input type="password" id="pass" placeholder="Palavra-passe" class="w-full p-3 border rounded focus:ring-2 focus:ring-amber-500 outline-none text-center" required>
+            <div class="mb-6">
+                <input type="password" id="password" placeholder="Palavra-passe" required class="w-full p-3 border border-gray-300 rounded focus:ring-2 focus:ring-amber-500 outline-none">
             </div>
-            <p id="erro-login" class="text-red-500 text-sm font-bold hidden">Credenciais incorretas!</p>
-            <button type="submit" class="w-full bg-amber-700 text-white p-3 rounded font-bold hover:bg-amber-800 transition shadow-lg mt-4">Entrar no VOLTA</button>
+            
+            <p id="erro-msg" class="text-red-500 font-bold mb-4 hidden">Credenciais incorretas!</p>
+            
+            <button type="submit" class="w-full bg-amber-700 text-white p-3 rounded font-bold hover:bg-amber-800 transition shadow">
+                Entrar no Sistema
+            </button>
         </form>
     </div>
 
     <script>
-        document.getElementById('form-login').addEventListener('submit', function(e) {
-            e.preventDefault();
-            const user = document.getElementById('user').value;
-            const pass = document.getElementById('pass').value;
+        function fazerLogin(event) {
+            event.preventDefault();
+            const user = document.getElementById('username').value;
+            const pass = document.getElementById('password').value;
 
-            // Credenciais solicitadas
             if (user === 'user' && pass === 'medieval') {
-                // Guarda uma "chave" temporária no browser a dizer que está autenticado
-                sessionStorage.setItem('autenticadoVolta', 'true');
-                window.location.href = 'volta.html';
+                // Guarda uma chave de sessão simples e redireciona para a app
+                sessionStorage.setItem('autenticado', 'sim');
+                window.location.href = 'app.html';
             } else {
-                document.getElementById('erro-login').classList.remove('hidden');
-                document.getElementById('pass').value = '';
+                document.getElementById('erro-msg').classList.remove('hidden');
             }
-        });
+        }
     </script>
 </body>
 </html>

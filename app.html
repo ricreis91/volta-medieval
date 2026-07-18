@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Viagem Medieval - Sistema VOLTA</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        
+        @media print {
+            body * { visibility: hidden; }
+            #historico, #historico * { visibility: visible; }
+            #historico { position: absolute; left: 0; top: 0; width: 100%; }
+            .no-print { display: none !important; }
+        }
+
+        body.tema-escuro { background-color: #000000 !important; color: #f3f4f6; }
+        .tema-escuro .caixa-principal { background-color: #111827 !important; border-color: #dc2626 !important; }
+        .tema-escuro .titulo-principal { color: #ef4444 !important; }
+        .tema-escuro input, .tema-escuro select { background-color: #374151 !important; color: white !important; border-color: #4b5563 !important; }
+        .tema-escuro table { color: #e5e7eb; }
+        .tema-escuro thead tr { background-color: #1f2937 !important; border-color: #dc2626 !important; color: #f3f4f6 !important; }
+        .tema-escuro tbody tr { border-color: #374151 !important; }
+        .tema-escuro tbody tr:hover { background-color: #1f2937 !important; }
+        .tema-escuro .bg-white, .tema-escuro .bg-amber-50, .tema-escuro .bg-blue-50, .tema-escuro .bg-green-50, .tema-escuro .bg-gray-50, .tema-escuro .bg-gray-100 { background-color: #111827 !important; border-color:#374151 !important;}
+        .tema-escuro h2, .tema-escuro h3, .tema-escuro h4 { color: #ef4444 !important; }
+        .tema-escuro .text-gray-800, .tema-escuro .text-gray-700 { color: #d1d5db !important; }
+        .tema-escuro .modal-content { background-color: #1f2937 !important; color: white !important; border-color: #dc2626 !important; }
+        .tema-escuro .modal-content div.bg-gray-100 { background-color: #374151 !important; border-color: #4b5563 !important;}
+    </style>
+</head>
+<body class="bg-amber-50 p-6 font-sans transition-colors duration-300">
+
+     <!-- MODAL: Pedir Password -->
+    <div id="modal-password" class="fixed inset-0 bg-black bg-opacity-70 hidden flex items-center justify-center z-50 no-print">
+        <div class="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full text-center border-4 border-gray-600 modal-content">
+            <h3 class="text-2xl font-bold mb-4">Acesso Restrito</h3>
+            <p class="mb-4">Introduza a palavra-passe para aceder às definições.</p>
+            <input type="password" id="input-password" class="w-full p-3 border rounded mb-4 text-center text-xl text-black" placeholder="Palavra-passe">
+            <div class="flex justify-center gap-3">
+                <button onclick="fecharModais()" class="px-4 py-2 bg-gray-500 text-white rounded font-bold hover:bg-gray-600">Cancelar</button>
+                <button onclick="verificarPassword()" class="px-4 py-2 bg-blue-600 text-white rounded font-bold hover:bg-blue-700">Entrar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: Confirmação de Movimento (Levantamento/Devolução) -->
+    <div id="modal-confirmacao" class="fixed inset-0 bg-black bg-opacity-70 hidden flex items-center justify-center z-50 no-print">
+        <div class="bg-white p-8 rounded-lg shadow-xl max-w-lg w-full text-center border-4 border-amber-600 modal-content">
+            <h3 class="text-3xl font-bold mb-4" id="modal-titulo">Confirmação</h3>
+            <p class="text-lg text-gray-700 mb-6" id="modal-texto"></p>
+            
+            <div class="bg-gray-100 p-6 rounded-lg mb-8 border-2 border-dashed border-gray-400">
+                <p class="text-xl font-bold uppercase text-gray-500 mb-2" id="modal-label-valor">Valor a Movimentar:</p>
+                <p class="text-6xl font-black" id="modal-valor-dinheiro">0.00€</p>
+            </div>
+            
+            <div class="flex justify-center gap-4">
+                <button onclick="fecharModais()" class="px-6 py-3 bg-red-500 text-white rounded font-bold hover:bg-red-600 text-lg">Cancelar</button>
+                <button onclick="confirmarMovimento()" class="px-6 py-3 bg-green-600 text-white rounded font-bold hover:bg-green-700 text-lg shadow-lg">Confirmar Registo</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: Confirmação de Lote Parcial -->
+    <div id="modal-lote-parcial" class="fixed inset-0 bg-black bg-opacity-70 hidden flex items-center justify-center z-50 no-print">
+        <div class="bg-white p-6 rounded-lg shadow-xl max-w-md w-full text-center border-4 border-yellow-500 modal-content">
+            <h3 class="text-2xl font-bold mb-4 text-yellow-600">Correspondência Parcial</h3>
+            <p class="mb-4">O lote inserido não é exatamente igual, mas os primeiros caracteres coincidem com um lote levantado por esta equipa.</p>
+            <p class="mb-6 font-bold text-lg bg-yellow-100 p-3 rounded text-yellow-800">Lote Sugerido: <span id="modal-parcial-lote-nome" class="font-black"></span></p>
+            <p class="mb-4 text-sm">Aceita processar a devolução utilizando este lote levantado?</p>
+            <div class="flex justify-center gap-3">
+                <button onclick="fecharModais()" class="px-4 py-2 bg-red-500 text-white rounded font-bold hover:bg-red-600">Rejeitar</button>
+                <button onclick="confirmarLoteParcial()" class="px-4 py-2 bg-green-600 text-white rounded font-bold hover:bg-green-700">Aceitar Correspondência</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: Confirmar Edição de Responsável -->
+    <div id="modal-confirmar-edicao" class="fixed inset-0 bg-black bg-opacity-70 hidden flex items-center justify-center z-50 no-print">
+        <div class="bg-white p-6 rounded-lg shadow-xl max-w-md w-full text-center border-4 border-blue-600 modal-content">
+            <h3 class="text-2xl font-bold mb-4">Confirmar Alteração</h3>
+            <p class="mb-4">Tem a certeza que deseja guardar os novos dados para este responsável?</p>
+            <div class="flex justify-center gap-3">
+                <button onclick="fecharModais()" class="px-4 py-2 bg-gray-500 text-white rounded font-bold hover:bg-gray-600">Cancelar</button>
+                <button onclick="salvarEdicaoResponsavelFinal()" class="px-4 py-2 bg-blue-600 text-white rounded font-bold hover:bg-blue-700">Sim, Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: Confirmar Remoção de Responsável -->
+    <div id="modal-remover-responsavel" class="fixed inset-0 bg-black bg-opacity-70 hidden flex items-center justify-center z-50 no-print">
+        <div class="bg-white p-6 rounded-lg shadow-xl max-w-md w-full text-center border-4 border-red-600 modal-content">
+            <h3 class="text-2xl font-bold mb-4 text-red-600">Remover Responsável</h3>
+            <p class="mb-4">Tem a certeza que deseja eliminar <b id="modal-nome-remover"></b>?</p>
+            <p class="mb-6 text-sm text-gray-600">O histórico associado não será apagado, mas o nome aparecerá como "Apagado".</p>
+            <div class="flex justify-center gap-3">
+                <button onclick="fecharModais()" class="px-4 py-2 bg-gray-500 text-white rounded font-bold hover:bg-gray-600">Cancelar</button>
+                <button onclick="confirmarRemocaoResponsavel()" class="px-4 py-2 bg-red-600 text-white rounded font-bold hover:bg-red-700">Sim, Eliminar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: Importar CSV - Dupla Confirmação -->
+    <div id="modal-importar-csv" class="fixed inset-0 bg-black bg-opacity-80 hidden flex items-center justify-center z-50 no-print">
+        <div class="bg-white p-6 rounded-lg shadow-xl max-w-md w-full text-center border-4 border-red-600 modal-content">
+            <h3 class="text-2xl font-bold mb-4 text-red-600">Atenção: Substituição de Dados</h3>
+            <p class="mb-4 font-bold">O ficheiro foi lido com sucesso.</p>
+            <p class="mb-6 text-sm">Esta ação vai <b class="text-red-600">APAGAR</b> todos os movimentos e responsáveis atuais e substituir pela informação do ficheiro CSV.</p>
+            <p class="mb-6">Deseja mesmo avançar com a substituição total?</p>
+            <div class="flex justify-center gap-3">
+                <button onclick="fecharModais()" class="px-4 py-2 bg-gray-500 text-white rounded font-bold hover:bg-gray-600">Cancelar</button>
+                <button onclick="confirmarImportacaoCSV()" class="px-4 py-2 bg-red-600 text-white rounded font-bold hover:bg-red-700">Sim, Substituir Tudo</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: Limpar Dados - Passo 1 -->
+    <div id="modal-limpar-1" class="fixed inset-0 bg-black bg-opacity-80 hidden flex items-center justify-center z-50 no-print">
+        <div class="bg-white p-6 rounded-lg shadow-xl max-w-md w-full text-center border-4 border-red-600 modal-content">
+            <h3 class="text-2xl font-bold mb-4 text-red-600">Aviso Crítico</h3>
+            <p class="mb-4 font-bold">Está prestes a apagar TODOS os registos (histórico) desta máquina.</p>
+            <p class="mb-6">Recomendamos que exporte os dados para Excel antes de continuar. O que deseja fazer?</p>
+            <div class="flex flex-col gap-3">
+                <button onclick="limparPasso1Exportar()" class="w-full px-4 py-3 bg-green-600 text-white rounded font-bold hover:bg-green-700">1º Exportar Excel, depois Apagar</button>
+                <button onclick="abrirLimparPasso2()" class="w-full px-4 py-3 bg-red-600 text-white rounded font-bold hover:bg-red-700">Avançar e Apagar SEM Exportar</button>
+                <button onclick="fecharModais()" class="w-full px-4 py-2 bg-gray-500 text-white rounded font-bold hover:bg-gray-600 mt-2">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: Limpar Dados - Passo 2 -->
+    <div id="modal-limpar-2" class="fixed inset-0 bg-black bg-opacity-90 hidden flex items-center justify-center z-50 no-print">
+        <div class="bg-white p-6 rounded-lg shadow-xl max-w-md w-full text-center border-4 border-red-800 modal-content">
+            <h3 class="text-3xl font-black mb-4 text-red-700">Confirmação Final</h3>
+            <p class="mb-6 text-lg">Tem a <b>CERTEZA ABSOLUTA</b>? Todos os registos de levantamentos e devoluções serão perdidos permanentemente.</p>
+            <div class="flex justify-center gap-3">
+                <button onclick="fecharModais()" class="px-6 py-3 bg-gray-500 text-white rounded font-bold hover:bg-gray-600">Cancelar</button>
+                <button onclick="confirmarLimpezaTotal()" class="px-6 py-3 bg-red-700 text-white rounded font-bold hover:bg-red-800 shadow-lg">Sim, Apagar Tudo</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="modal-password" class="fixed inset-0 bg-black bg-opacity-70 hidden flex items-center justify-center z-50 no-print">
+        <div class="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full text-center border-4 border-gray-600 modal-content">
+            <h3 class="text-2xl font-bold mb-4">Acesso Restrito</h3>
+            <p class="mb-4">Introduza a palavra-passe para aceder às definições.</p>
+            <input type="password" id="input-password" class="w-full p-3 border rounded mb-4 text-center text-xl text-black" placeholder="Palavra-passe">
+            <div class="flex justify-center gap-3">
+                <button onclick="fecharModais()" class="px-4 py-2 bg-gray-500 text-white rounded font-bold hover:bg-gray-600">Cancelar</button>
+                <button onclick="verificarPassword()" class="px-4 py-2 bg-blue-600 text-white rounded font-bold hover:bg-blue-700">Entrar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-confirmacao" class="fixed inset-0 bg-black bg-opacity-70 hidden flex items-center justify-center z-50 no-print">
+        <div class="bg-white p-8 rounded-lg shadow-xl max-w-lg w-full text-center border-4 border-amber-600 modal-content">
+            <h3 class="text-3xl font-bold mb-4" id="modal-titulo">Confirmação</h3>
+            <p class="text-lg text-gray-700 mb-6" id="modal-texto"></p>
+            
+            <div class="bg-gray-100 p-6 rounded-lg mb-8 border-2 border-dashed border-gray-400">
+                <p class="text-xl font-bold uppercase text-gray-500 mb-2" id="modal-label-valor">Valor a Movimentar:</p>
+                <p class="text-6xl font-black" id="modal-valor-dinheiro">0.00€</p>
+            </div>
+            
+            <div class="flex justify-center gap-4">
+                <button onclick="fecharModais()" class="px-6 py-3 bg-red-500 text-white rounded font-bold hover:bg-red-600 text-lg">Cancelar</button>
+                <button onclick="confirmarMovimento()" class="px-6 py-3 bg-green-600 text-white rounded font-bold hover:bg-green-700 text-lg shadow-lg">Confirmar Registo</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-lote-parcial" class="fixed inset-0 bg-black bg-opacity-70 hidden flex items-center justify-center z-50 no-print">
+        <div class="bg-white p-6 rounded-lg shadow-xl max-w-md w-full text-center border-4 border-yellow-500 modal-content">
+            <h3 class="text-2xl font-bold mb-4 text-yellow-600">Correspondência Parcial</h3>
+            <p class="mb-4">O lote inserido não é exatamente igual, mas os primeiros caracteres coincidem com um lote levantado por esta equipa.</p>
+            <p class="mb-6 font-bold text-lg bg-yellow-100 p-3 rounded text-yellow-800">Lote Sugerido: <span id="modal-parcial-lote-nome" class="font-black"></span></p>
+            <p class="mb-4 text-sm">Aceita processar a devolução utilizando este lote levantado?</p>
+            <div class="flex justify-center gap-3">
+                <button onclick="fecharModais()" class="px-4 py-2 bg-red-500 text-white rounded font-bold hover:bg-red-600">Rejeitar</button>
+                <button onclick="confirmarLoteParcial()" class="px-4 py-2 bg-green-600 text-white rounded font-bold hover:bg-green-700">Aceitar Correspondência</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-confirmar-edicao" class="fixed inset-0 bg-black bg-opacity-70 hidden flex items-center justify-center z-50 no-print">
+        <div class="bg-white p-6 rounded-lg shadow-xl max-w-md w-full text-center border-4 border-blue-600 modal-content">
+            <h3 class="text-2xl font-bold mb-4">Confirmar Alteração</h3>
+            <p class="mb-4">Tem a certeza que deseja guardar os novos dados para este responsável?</p>
+            <div class="flex justify-center gap-3">
+                <button onclick="fecharModais()" class="px-4 py-2 bg-gray-500 text-white rounded font-bold hover:bg-gray-600">Cancelar</button>
+                <button onclick="salvarEdicaoResponsavelFinal()" class="px-4 py-2 bg-blue-600 text-white rounded font-bold hover:bg-blue-700">Sim, Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-remover-responsavel" class="fixed inset-0 bg-black bg-opacity-70 hidden flex items-center justify-center z-50 no-print">
+        <div class="bg-white p-6 rounded-lg shadow-xl max-w-md w-full text-center border-4 border-red-600 modal-content">
+            <h3 class="text-2xl font-bold mb-4 text-red-600">Remover Responsável</h3>
+            <p class="mb-4">Tem a certeza que deseja eliminar <b id="modal-nome-remover"></b>?</p>
+            <p class="mb-6 text-sm text-gray-600">O histórico associado não será apagado, mas o nome aparecerá como "Apagado".</p>
+            <div class="flex justify-center gap-3">
+                <button onclick="fecharModais()" class="px-4 py-2 bg-gray-500 text-white rounded font-bold hover:bg-gray-600">Cancelar</button>
+                <button onclick="confirmarRemocaoResponsavel()" class="px-4 py-2 bg-red-600 text-white rounded font-bold hover:bg-red-700">Sim, Eliminar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-importar-csv" class="fixed inset-0 bg-black bg-opacity-80 hidden flex items-center justify-center z-50 no-print">
+        <div class="bg-white p-6 rounded-lg shadow-xl max-w-md w-full text-center border-4 border-red-600 modal-content">
+            <h3 class="text-2xl font-bold mb-4 text-red-600">Atenção: Substituição de Dados</h3>
+            <p class="mb-4 font-bold">O ficheiro foi lido com sucesso.</p>
+            <p class="mb-6 text-sm">Esta ação vai <b class="text-red-600">APAGAR</b> todos os movimentos e responsáveis atuais e substituir pela informação do ficheiro CSV.</p>
+            <p class="mb-6">Deseja mesmo avançar com a substituição total?</p>
+            <div class="flex justify-center gap-3">
+                <button onclick="fecharModais()" class="px-4 py-2 bg-gray-500 text-white rounded font-bold hover:bg-gray-600">Cancelar</button>
+                <button onclick="confirmarImportacaoCSV()" class="px-4 py-2 bg-red-600 text-white rounded font-bold hover:bg-red-700">Sim, Substituir Tudo</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-limpar-1" class="fixed inset-0 bg-black bg-opacity-80 hidden flex items-center justify-center z-50 no-print">
+        <div class="bg-white p-6 rounded-lg shadow-xl max-w-md w-full text-center border-4 border-red-600 modal-content">
+            <h3 class="text-2xl font-bold mb-4 text-red-600">Aviso Crítico</h3>
+            <p class="mb-4 font-bold">Está prestes a apagar TODOS os registos (histórico) desta máquina.</p>
+            <p class="mb-6">Recomendamos que exporte os dados para Excel antes de continuar. O que deseja fazer?</p>
+            <div class="flex flex-col gap-3">
+                <button onclick="limparPasso1Exportar()" class="w-full px-4 py-3 bg-green-600 text-white rounded font-bold hover:bg-green-700">1º Exportar Excel, depois Apagar</button>
+                <button onclick="abrirLimparPasso2()" class="w-full px-4 py-3 bg-red-600 text-white rounded font-bold hover:bg-red-700">Avançar e Apagar SEM Exportar</button>
+                <button onclick="fecharModais()" class="w-full px-4 py-2 bg-gray-500 text-white rounded font-bold hover:bg-gray-600 mt-2">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-limpar-2" class="fixed inset-0 bg-black bg-opacity-90 hidden flex items-center justify-center z-50 no-print">
+        <div class="bg-white p-6 rounded-lg shadow-xl max-w-md w-full text-center border-4 border-red-800 modal-content">
+            <h3 class="text-3xl font-black mb-4 text-red-700">Confirmação Final</h3>
+            <p class="mb-6 text-lg">Tem a <b>CERTEZA ABSOLUTA</b>? Todos os registos de levantamentos e devoluções serão perdidos permanentemente.</p>
+            <div class="flex justify-center gap-3">
+                <button onclick="fecharModais()" class="px-6 py-3 bg-gray-500 text-white rounded font-bold hover:bg-gray-600">Cancelar</button>
+                <button onclick="confirmarLimpezaTotal()" class="px-6 py-3 bg-red-700 text-white rounded font-bold hover:bg-red-800 shadow-lg">Sim, Apagar Tudo</button>
+            </div>
+        </div>
+    </div>
+
+   <div class="max-w-6xl mx-auto bg-white rounded-lg shadow-md p-6 border-t-8 border-amber-700 caixa-principal relative">
+    
+    <!-- NOVO BOTÃO DE LOGOUT AQUI -->
+    <button onclick="fazerLogout()" class="absolute top-4 left-4 px-4 py-2 bg-red-100 text-red-700 border border-red-300 hover:bg-red-600 hover:text-white transition-colors duration-300 rounded font-bold no-print shadow-sm text-sm" title="Sair da Aplicação">
+        Sair / Logout
+    </button>
+    
+    <!-- Botão de definições que já lá estava -->
+    <button onclick="abrirModalPassword()" class="absolute top-4 right-4 text-3xl hover:rotate-90 transition-transform duration-300 no-print" title="Definições">⚙️</button>
+
+        <div class="text-center mb-8 border-b pb-6">
+            <div class="flex justify-center items-center gap-8 mb-4">
+                <img src="logotipo viagem medieval (2).jpg" alt="Logotipo Viagem Medieval" class="h-32 object-contain" onerror="this.style.display='none'">
+                <img src="logo-volta.jpg" alt="Logotipo VOLTA" class="h-32 object-contain rounded-full" onerror="this.style.display='none'">
+            </div>
+            <h1 class="text-3xl font-bold text-amber-800 uppercase tracking-widest titulo-principal">Sistema VOLTA - Gestão de Garrafas</h1>
+        </div>
+
+        <div class="flex flex-wrap justify-center mb-8 gap-3 no-print" id="botoes-navegacao">
+            <button onclick="mudarAba('resumo')" class="px-6 py-2 bg-gray-200 hover:bg-gray-300 rounded font-bold text-gray-700">Resumo</button>
+            <button onclick="mudarAba('levantamento')" class="px-6 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded font-bold shadow">Registar Levantamento</button>
+            <button onclick="mudarAba('devolucao')" class="px-6 py-2 bg-green-600 text-white hover:bg-green-700 rounded font-bold shadow">Registar Devolução</button>
+            <button onclick="mudarAba('historico')" class="px-6 py-2 bg-purple-600 text-white hover:bg-purple-700 rounded font-bold shadow">Histórico</button>
+        </div>
+
+        <!-- ABA RESUMO -->
+        <div id="resumo" class="tab-content active">
+            <h2 class="text-2xl font-bold mb-4 text-gray-800">Estado dos Responsáveis</h2>
+            <div class="overflow-x-auto rounded-lg border border-gray-200">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-amber-100 border-b-2 border-amber-200 text-amber-900">
+                            <th class="p-3">Responsável (Equipa)</th>
+                            <th class="p-3 text-center">Plafond (Garrafas)</th>
+                            <th class="p-3 text-center">Levantadas</th>
+                            <th class="p-3 text-center">Devolvidas</th>
+                            <th class="p-3 text-center">Em Falta</th>
+                            <th class="p-3 text-center text-red-700">Caução Paga</th>
+                            <th class="p-3 text-center text-green-700">Caução a Devolver</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabela-resumo">
+                        <!-- Preenchido via JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ABA LEVANTAMENTO -->
+        <div id="levantamento" class="tab-content">
+            <div class="flex flex-col items-center">
+                <h2 class="text-2xl font-bold mb-6 text-blue-700">Registar Entrega de Garrafas</h2>
+                <form onsubmit="preRegistarMovimento(event, 'levantamento')" class="w-full max-w-md bg-blue-50 p-6 rounded-lg border border-blue-200 shadow-sm">
+                    <div class="mb-4">
+                        <label class="block font-bold mb-2 text-blue-900">Responsável</label>
+                        <select id="equipa-levantamento" class="w-full p-3 border rounded focus:ring-2 focus:ring-blue-500 outline-none" required></select>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block font-bold mb-2 text-blue-900">Lote da Garrafa</label>
+                        <input type="text" id="lote-levantamento" oninput="this.value = this.value.toUpperCase().replace(/\s+/g, '')" class="w-full p-3 border rounded focus:ring-2 focus:ring-blue-500 outline-none font-mono" required placeholder="Ex: LOTEA1">
+                    </div>
+                    <div class="mb-6">
+                        <label class="block font-bold mb-2 text-blue-900">Quantidade</label>
+                        <input type="number" id="qtd-levantamento" min="1" class="w-full p-3 border rounded focus:ring-2 focus:ring-blue-500 outline-none text-xl" required>
+                    </div>
+                    <button type="submit" class="w-full bg-blue-600 text-white p-4 rounded text-xl font-bold hover:bg-blue-700 shadow-md">Simular Levantamento</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- ABA DEVOLUÇÃO -->
+        <div id="devolucao" class="tab-content">
+            <div class="flex flex-col items-center">
+                <h2 class="text-2xl font-bold mb-6 text-green-700">Registar Devolução de Garrafas</h2>
+                <form onsubmit="preRegistarMovimento(event, 'devolucao')" class="w-full max-w-md bg-green-50 p-6 rounded-lg border border-green-200 shadow-sm">
+                    <div class="mb-4">
+                        <label class="block font-bold mb-2 text-green-900">Responsável</label>
+                        <select id="equipa-devolucao" class="w-full p-3 border rounded focus:ring-2 focus:ring-green-500 outline-none" required></select>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block font-bold mb-2 text-green-900">Lote da Garrafa</label>
+                        <input type="text" id="lote-devolucao" oninput="this.value = this.value.toUpperCase().replace(/\s+/g, '')" class="w-full p-3 border rounded focus:ring-2 focus:ring-green-500 outline-none font-mono" required placeholder="Ex: LOTEA1">
+                    </div>
+                    <div class="mb-6">
+                        <label class="block font-bold mb-2 text-green-900">Quantidade</label>
+                        <input type="number" id="qtd-devolucao" min="1" class="w-full p-3 border rounded focus:ring-2 focus:ring-green-500 outline-none text-xl" required>
+                    </div>
+                    <button type="submit" class="w-full bg-green-600 text-white p-4 rounded text-xl font-bold hover:bg-green-700 shadow-md">Simular Devolução</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- ABA HISTÓRICO -->
+        <div id="historico" class="tab-content">
+            <div class="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
+                <h2 class="text-2xl font-bold text-purple-700">Histórico de Movimentos</h2>
+                <div class="flex gap-2 items-center no-print">
+                    <label class="font-bold text-gray-700 text-sm">Filtrar:</label>
+                    <select id="filtro-historico" onchange="atualizarHistorico()" class="p-2 border rounded text-sm w-48"></select>
+                </div>
+                <div class="space-x-2 no-print">
+                    <button onclick="exportarExcel()" class="px-4 py-2 bg-green-100 text-green-800 border border-green-300 hover:bg-green-200 rounded font-bold">📥 Exportar CSV</button>
+                    <button onclick="window.print()" class="px-4 py-2 bg-gray-100 text-gray-800 border border-gray-300 hover:bg-gray-200 rounded font-bold">🖨️ Imprimir</button>
+                </div>
+            </div>
+            <div class="overflow-x-auto rounded-lg border border-gray-200">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-purple-100 border-b-2 border-purple-200 text-purple-900">
+                            <th class="p-3">Data e Hora</th>
+                            <th class="p-3">Responsável</th>
+                            <th class="p-3 text-center">Tipo</th>
+                            <th class="p-3 text-center">Lote</th>
+                            <th class="p-3 text-center">Quantidade</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabela-historico">
+                        <!-- Preenchido via JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- ABA DEFINIÇÕES -->
+        <div id="definicoes" class="tab-content no-print">
+            <h2 class="text-2xl font-bold mb-6 text-gray-800">Definições do Sistema</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <div class="p-4 bg-gray-100 rounded-lg border border-gray-300 flex justify-between items-center h-full">
+                    <div>
+                        <h4 class="font-bold text-lg">Modo Escuro</h4>
+                        <p class="text-sm text-gray-600">Altera as cores para visualização noturna.</p>
+                    </div>
+                    <button onclick="toggleModoEscuro()" id="btn-modo-escuro" class="px-4 py-2 bg-gray-800 text-white rounded font-bold hover:bg-black">Ativar Fundo Preto</button>
+                </div>
+
+                <div class="p-4 bg-gray-100 rounded-lg border border-gray-300">
+                    <h4 class="font-bold text-lg mb-2">Correspondência de Lote Parcial</h4>
+                    <p class="text-sm text-gray-600 mb-3">Nº de caracteres (iniciais) para sugerir devolução se o lote não for exato.</p>
+                    <div class="flex gap-2">
+                        <input type="number" id="input-tamanho-lote" min="1" max="20" class="w-24 p-2 border rounded">
+                        <button onclick="salvarConfigLote()" class="px-4 py-2 bg-blue-600 text-white rounded font-bold hover:bg-blue-700">Guardar</button>
+                    </div>
+                </div>
+            </div>
+
+            <h3 class="text-xl font-bold mb-3 mt-6">Adicionar Novo Responsável</h3>
+            <div class="bg-gray-50 p-4 rounded-lg border border-gray-200 mb-6 flex flex-wrap gap-4 items-end">
+                <div class="flex-1 min-w-[200px]">
+                    <label class="block text-sm font-bold mb-1">Nome / Equipa</label>
+                    <input type="text" id="novo-nome-equipa" class="w-full p-2 border rounded" placeholder="Ex: Falcoeiros">
+                </div>
+                <div class="w-40">
+                    <!-- Alterado step para 1 porque plafond agora é garrafas inteiras -->
+                    <label class="block text-sm font-bold mb-1">Plafond (Garrafas)</label>
+                    <input type="number" id="novo-plafond-equipa" step="1" min="0" class="w-full p-2 border rounded" placeholder="0">
+                </div>
+                <button onclick="adicionarEquipa()" class="px-6 py-2 bg-green-600 text-white rounded font-bold hover:bg-green-700 h-10">Adicionar</button>
+            </div>
+
+            <h3 class="text-xl font-bold mb-3">Gerir Responsáveis e Plafonds</h3>
+            <div class="overflow-x-auto rounded-lg border border-gray-200 mb-8">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-gray-200 border-b-2 border-gray-300">
+                            <th class="p-3">Nome do Responsável / Equipa</th>
+                            <th class="p-3 text-center">Plafond (Garrafas)</th>
+                            <th class="p-3 text-center">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabela-responsaveis-edit">
+                        <!-- Preenchido via JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="p-6 bg-blue-50 rounded-lg border border-blue-200">
+                    <h4 class="font-bold text-xl text-blue-800 mb-2">Importar Base de Dados</h4>
+                    <p class="mb-4 text-sm text-gray-700">Carregar ficheiro .CSV exportado por este sistema para repor dados.</p>
+                    <input type="file" id="file-import-csv" accept=".csv" class="mb-3 block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-white">
+                    <button onclick="lerCSVImportacao()" class="px-6 py-2 bg-blue-600 text-white rounded font-bold hover:bg-blue-700 shadow w-full">Analisar Ficheiro CSV</button>
+                </div>
+
+                <div class="p-6 bg-red-50 rounded-lg border border-red-200 text-center">
+                    <h4 class="font-bold text-xl text-red-700 mb-2">Zona de Perigo</h4>
+                    <p class="mb-4 text-sm text-gray-700">Eliminar todo o histórico de registos desta máquina. (Irreversível)</p>
+                    <button onclick="abrirLimparPasso1()" class="px-6 py-2 bg-red-600 text-white rounded font-bold hover:bg-red-700 shadow w-full">APAGAR MEMÓRIA DO SISTEMA</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK (Modular) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+        import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
+
+        // Verifica a autenticação do login
+        if (sessionStorage.getItem('autenticado') !== 'sim') {
+            window.location.href = 'index.html';
+        }
+	function fazerLogout() {
+    // Limpa a chave de sessão
+    sessionStorage.removeItem('autenticado');
+    // Redireciona de volta para a página de login
+    window.location.href = 'index.html';
+}
+        // Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyCe0YsnIhDJ5a4EKFNgeg_rZDdQssXV1V0",
+            authDomain: "volta-medieval.firebaseapp.com",
+            databaseURL: "https://volta-medieval-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "volta-medieval",
+            storageBucket: "volta-medieval.firebasestorage.app",
+            messagingSenderId: "749235714483",
+            appId: "1:749235714483:web:7ffcfce182dea4eaadb3c6"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
+
+        const PRECO_CAUCAO = 0.10;
+        let movimentoPendente = null;
+        let edicaoResponsavelPendente = null;
+        let remocaoResponsavelPendente = null; 
+        let dbNovoParaImportar = null;
+
+        // Base de Dados Global Vazia inicialmente
+        let db = { equipas: [], movimentos: [], config: { tamanhoLoteParcial: 6 } };
+
+        // Subscrever à base de dados para obter updates em tempo real
+        const dbRef = ref(database, 'voltaDB');
+        onValue(dbRef, (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                db = data;
+                if (!db.equipas) db.equipas = [];
+                if (!db.movimentos) db.movimentos = [];
+                if (!db.config) db.config = { tamanhoLoteParcial: 6 };
+            } else {
+                // Caso não exista nada na base de dados (primeiro uso), preenche as defaults
+                db = {
+                    equipas: [
+                        { id: 1, nome: "Os Templários", plafond: 20 },
+                        { id: 2, nome: "Ordem de Cristo", plafond: 30 },
+                        { id: 3, nome: "Arqueiros do Rei", plafond: 15 }
+                    ],
+                    movimentos: [],
+                    config: { tamanhoLoteParcial: 6 }
+                };
+                set(dbRef, db); // Escreve as defaults no Firebase
+            }
+            
+            // Atualizar UI com os novos dados
+            carregarSelects();
+            if (document.getElementById('resumo').classList.contains('active')) atualizarTabela();
+            if (document.getElementById('historico').classList.contains('active')) atualizarHistorico();
+            if (document.getElementById('definicoes').classList.contains('active')) {
+                carregarTabelaDefinicoes();
+                document.getElementById('input-tamanho-lote').value = db.config.tamanhoLoteParcial;
+            }
+        });
+
+        // Função para Escrever na Base de Dados do Firebase (Substitui LocalStorage)
+        function guardarDB() {
+            set(ref(database, 'voltaDB'), db).catch((error) => {
+                console.error("Erro ao guardar na base de dados:", error);
+                alert("Erro ao guardar os dados. Verifique a sua ligação.");
+            });
+        }
+
+        let modoEscuroAtivo = localStorage.getItem('voltaTemaEscuro') === 'true';
+        if (modoEscuroAtivo) aplicarModoEscuroVisual();
+
+        function mudarAba(abaId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.getElementById(abaId).classList.add('active');
+            
+            if (abaId === 'resumo') atualizarTabela();
+            if (abaId === 'historico') atualizarHistorico();
+            if (abaId === 'definicoes') {
+                carregarTabelaDefinicoes();
+                document.getElementById('input-tamanho-lote').value = db.config.tamanhoLoteParcial;
+            }
+        }
+
+        function fecharModais() {
+            document.querySelectorAll('[id^="modal-"]').forEach(el => el.classList.add('hidden'));
+            movimentoPendente = null;
+            edicaoResponsavelPendente = null;
+            remocaoResponsavelPendente = null;
+        }
+
+        function abrirModalPassword() {
+            document.getElementById('input-password').value = '';
+            document.getElementById('modal-password').classList.remove('hidden');
+            document.getElementById('input-password').focus();
+        }
+
+        function verificarPassword() {
+            const pwd = document.getElementById('input-password').value;
+            if (pwd === 'viagem') { // Palavra-passe de configurações
+                fecharModais();
+                mudarAba('definicoes');
+            } else {
+                alert('Palavra-passe incorreta!');
+            }
+        }
+
+        document.getElementById('input-password').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') verificarPassword();
+        });
+
+        function toggleModoEscuro() {
+            modoEscuroAtivo = !modoEscuroAtivo;
+            localStorage.setItem('voltaTemaEscuro', modoEscuroAtivo);
+            aplicarModoEscuroVisual();
+        }
+
+        function aplicarModoEscuroVisual() {
+            const btn = document.getElementById('btn-modo-escuro');
+            if (modoEscuroAtivo) {
+                document.body.classList.add('tema-escuro');
+                if (btn) { btn.innerHTML = "Desativar Modo Escuro"; btn.className = "px-4 py-2 bg-gray-200 text-gray-800 rounded font-bold hover:bg-white"; }
+            } else {
+                document.body.classList.remove('tema-escuro');
+                if (btn) { btn.innerHTML = "Ativar Fundo Preto"; btn.className = "px-4 py-2 bg-gray-800 text-white rounded font-bold hover:bg-black"; }
+            }
+        }
+
+        function salvarConfigLote() {
+            const tamanho = parseInt(document.getElementById('input-tamanho-lote').value);
+            if(tamanho > 0) {
+                db.config.tamanhoLoteParcial = tamanho;
+                guardarDB();
+                alert(`Configuração guardada! O sistema verificará os primeiros ${tamanho} caracteres.`);
+            } else {
+                alert('Valor inválido.');
+            }
+        }
+
+        function adicionarEquipa() {
+            const nome = document.getElementById('novo-nome-equipa').value.trim();
+            // Lida com garrafas, usamos parseInt em vez de parseFloat
+            const plafond = parseInt(document.getElementById('novo-plafond-equipa').value, 10); 
+            
+            if (!nome || isNaN(plafond) || plafond < 0) {
+                alert('Por favor preencha um nome válido e um plafond de garrafas positivo.');
+                return;
+            }
+
+            const novoId = db.equipas.length ? Math.max(...db.equipas.map(e => e.id)) + 1 : 1;
+            db.equipas.push({ id: novoId, nome, plafond });
+            guardarDB();
+            
+            document.getElementById('novo-nome-equipa').value = '';
+            document.getElementById('novo-plafond-equipa').value = '';
+            
+            alert('Responsável adicionado com sucesso!');
+        }
+
+        function carregarTabelaDefinicoes() {
+            const tbody = document.getElementById('tabela-responsaveis-edit');
+            tbody.innerHTML = '';
+            
+            db.equipas.forEach(eq => {
+                const nomeSeguro = eq.nome.replace(/'/g, "\\'"); 
+                tbody.innerHTML += `
+                    <tr class="border-b hover:bg-gray-50 transition">
+                        <td class="p-3">
+                            <input type="text" id="edit-nome-${eq.id}" value="${eq.nome}" class="w-full p-2 border rounded font-bold text-gray-800 outline-none focus:border-blue-500">
+                        </td>
+                        <td class="p-3 text-center">
+                            <input type="number" step="1" id="edit-plafond-${eq.id}" value="${eq.plafond}" class="w-24 p-2 border rounded text-center outline-none focus:border-blue-500">
+                        </td>
+                        <td class="p-3 text-center space-x-2">
+                            <button onclick="prepararEdicaoResponsavel(${eq.id})" class="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 font-bold text-sm">Guardar</button>
+                            <button onclick="prepararRemocaoResponsavel(${eq.id}, '${nomeSeguro}')" class="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 font-bold text-sm">Remover</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        function prepararEdicaoResponsavel(id) {
+            const novoNome = document.getElementById(`edit-nome-${id}`).value;
+            const novoPlafond = parseInt(document.getElementById(`edit-plafond-${id}`).value, 10); // Transformado para parseInt
+            
+            if (!novoNome.trim() || isNaN(novoPlafond) || novoPlafond < 0) {
+                alert("Por favor insira um nome válido e um plafond positivo de garrafas.");
+                return;
+            }
+
+            edicaoResponsavelPendente = { id, nome: novoNome, plafond: novoPlafond };
+            document.getElementById('modal-confirmar-edicao').classList.remove('hidden');
+        }
+
+        function salvarEdicaoResponsavelFinal() {
+            if (!edicaoResponsavelPendente) return;
+            
+            const index = db.equipas.findIndex(e => e.id === edicaoResponsavelPendente.id);
+            if (index !== -1) {
+                db.equipas[index].nome = edicaoResponsavelPendente.nome;
+                db.equipas[index].plafond = edicaoResponsavelPendente.plafond;
+                guardarDB();
+            }
+            fecharModais();
+        }
+
+        function prepararRemocaoResponsavel(id, nome) {
+            remocaoResponsavelPendente = id;
+            document.getElementById('modal-nome-remover').innerText = nome;
+            document.getElementById('modal-remover-responsavel').classList.remove('hidden');
+        }
+
+        function confirmarRemocaoResponsavel() {
+            if (!remocaoResponsavelPendente) return;
+            db.equipas = db.equipas.filter(e => e.id !== remocaoResponsavelPendente);
+            guardarDB();
+            fecharModais();
+        }
+
+        function lerCSVImportacao() {
+            const fileInput = document.getElementById('file-import-csv');
+            const file = fileInput.files[0];
+            if (!file) return alert("Selecione um ficheiro CSV primeiro.");
+
+            const reader = new FileReader();
+            reader.onload = function(e) { processarCSVParsing(e.target.result); };
+            reader.readAsText(file, "UTF-8");
+        }
+
+        function processarCSVParsing(csvText) {
+            const linhas = csvText.split('\n').map(l => l.trim()).filter(l => l);
+            if(linhas.length < 2) return alert("Ficheiro inválido ou sem dados.");
+
+            let novasEquipas = [];
+            let novosMovimentos = [];
+            let idCounter = 1;
+
+            for(let i = 1; i < linhas.length; i++) {
+                const cols = linhas[i].split(';');
+                if (cols.length < 5) continue;
+                
+                const respNome = cols[1];
+                const tipoStr = cols[2].toLowerCase();
+                const lote = cols[3];
+                const quantidade = parseInt(cols[4]);
+
+                let equipa = novasEquipas.find(e => e.nome === respNome);
+                if (!equipa) {
+                    const equipaAtual = db.equipas.find(e => e.nome === respNome);
+                    equipa = { id: idCounter++, nome: respNome, plafond: equipaAtual ? equipaAtual.plafond : 0 };
+                    novasEquipas.push(equipa);
+                }
+
+                novosMovimentos.push({
+                    equipaId: equipa.id,
+                    tipo: tipoStr.includes('levantamento') ? 'levantamento' : 'devolucao',
+                    lote: lote,
+                    quantidade: quantidade,
+                    data: new Date().toISOString()
+                });
+            }
+
+            dbNovoParaImportar = { equipas: novasEquipas, movimentos: novosMovimentos, config: db.config };
+            document.getElementById('modal-importar-csv').classList.remove('hidden');
+        }
+
+        function confirmarImportacaoCSV() {
+            if (dbNovoParaImportar) {
+                db = dbNovoParaImportar;
+                guardarDB();
+                dbNovoParaImportar = null;
+                fecharModais();
+                document.getElementById('file-import-csv').value = "";
+                alert("Base de dados substituída com sucesso!");
+                mudarAba('resumo');
+            }
+        }
+
+        function abrirLimparPasso1() { document.getElementById('modal-limpar-1').classList.remove('hidden'); }
+        function abrirLimparPasso2() { fecharModais(); document.getElementById('modal-limpar-2').classList.remove('hidden'); }
+        function limparPasso1Exportar() { exportarExcel(); abrirLimparPasso2(); }
+        
+        function confirmarLimpezaTotal() {
+            db.movimentos = [];
+            guardarDB();
+            fecharModais();
+            alert("Memória limpa com sucesso!");
+            mudarAba('resumo');
+        }
+
+        function carregarSelects() {
+            let options = '<option value="">Selecione um responsável...</option>';
+            let filtroOptions = '<option value="">Todos os Responsáveis</option>';
+            
+            db.equipas.forEach(eq => {
+                options += `<option value="${eq.id}">${eq.nome}</option>`;
+                filtroOptions += `<option value="${eq.id}">${eq.nome}</option>`;
+            });
+            
+            document.getElementById('equipa-levantamento').innerHTML = options;
+            document.getElementById('equipa-devolucao').innerHTML = options;
+            document.getElementById('filtro-historico').innerHTML = filtroOptions;
+        }
+
+        function calcularEstadoEquipa(equipaId, listaMovimentos) {
+            const equipa = db.equipas.find(e => e.id === equipaId);
+            if(!equipa) return { levantadas: 0, devolvidas: 0, emFalta: 0, caucaoPaga: 0, caucaoADevolver: 0, plafondGarrafas: 0 };
+
+            const movs = listaMovimentos.filter(m => m.equipaId === equipaId);
+            const levantadas = movs.filter(m => m.tipo === 'levantamento').reduce((acc, curr) => acc + curr.quantidade, 0);
+            const devolvidas = movs.filter(m => m.tipo === 'devolucao').reduce((acc, curr) => acc + curr.quantidade, 0);
+            
+            // O Plafond já está definido em Garrafas
+            const plafondGarrafas = equipa.plafond; 
+            const emFalta = Math.max(0, levantadas - devolvidas);
+
+            const pagas = Math.max(0, levantadas - plafondGarrafas);
+            const caucaoPaga = pagas * PRECO_CAUCAO;
+            
+            const garrafasPerdidasPagas = Math.max(0, emFalta - plafondGarrafas);
+            const caucaoPerdida = garrafasPerdidasPagas * PRECO_CAUCAO;
+            const caucaoADevolver = Math.max(0, caucaoPaga - caucaoPerdida);
+
+            return { levantadas, devolvidas, emFalta, caucaoPaga, caucaoADevolver, plafondGarrafas };
+        }
+
+        function abrirModalConfirmacaoMovimento(equipaId, tipo, lote, quantidade, estadoAtual, formId) {
+            const equipa = db.equipas.find(e => e.id === equipaId);
+            
+            const movimentoSimulado = { equipaId, tipo, lote, quantidade, data: new Date().toISOString() };
+            const listaMovimentosFutura = [...db.movimentos, movimentoSimulado];
+            const estadoFuturo = calcularEstadoEquipa(equipaId, listaMovimentosFutura);
+
+            let valorFinanceiro = 0;
+            let mensagemLabel = "";
+            let corValor = "";
+
+            if (tipo === 'levantamento') {
+                valorFinanceiro = estadoFuturo.caucaoPaga - estadoAtual.caucaoPaga;
+                mensagemLabel = "Valor da Caução a COBRAR AGORA:";
+                corValor = valorFinanceiro > 0 ? "text-red-600" : "text-gray-500";
+                document.getElementById('modal-titulo').innerHTML = `Levantamento - ${equipa.nome}`;
+                document.getElementById('modal-texto').innerHTML = `O responsável vai levar <b>${quantidade}</b> garrafas (Lote: ${lote}).`;
+            } else {
+                valorFinanceiro = estadoFuturo.caucaoADevolver - estadoAtual.caucaoADevolver;
+                mensagemLabel = "Valor da Caução a DEVOLVER AGORA:";
+                corValor = valorFinanceiro > 0 ? "text-green-600" : "text-gray-500";
+                document.getElementById('modal-titulo').innerHTML = `Devolução - ${equipa.nome}`;
+                document.getElementById('modal-texto').innerHTML = `O responsável está a entregar <b>${quantidade}</b> garrafas (Lote: ${lote}).`;
+            }
+
+            document.getElementById('modal-label-valor').innerHTML = mensagemLabel;
+            const uiValor = document.getElementById('modal-valor-dinheiro');
+            uiValor.innerHTML = `${valorFinanceiro.toFixed(2)}€`;
+            uiValor.className = `text-6xl font-black ${corValor}`;
+
+            movimentoPendente = { ...movimentoSimulado, formId };
+            document.getElementById('modal-confirmacao').classList.remove('hidden');
+        }
+
+        function preRegistarMovimento(event, tipo) {
+            event.preventDefault();
+            
+            const equipaId = parseInt(document.getElementById(`equipa-${tipo}`).value);
+            const loteInserido = document.getElementById(`lote-${tipo}`).value.toUpperCase().replace(/\s+/g, '');
+            const quantidade = parseInt(document.getElementById(`qtd-${tipo}`).value);
+            const estadoAtual = calcularEstadoEquipa(equipaId, db.movimentos);
+
+            if (tipo === 'devolucao') {
+                if (quantidade > estadoAtual.emFalta) {
+                    alert(`ERRO: A equipa tem apenas ${estadoAtual.emFalta} garrafas.\nNão é possível registar uma devolução de ${quantidade}.`);
+                    return;
+                }
+
+                const movsLevantamento = db.movimentos.filter(m => m.equipaId === equipaId && m.tipo === 'levantamento');
+                const exato = movsLevantamento.find(m => m.lote === loteInserido);
+
+                if (!exato) {
+                    const limit = db.config.tamanhoLoteParcial;
+                    const inputPrefix = loteInserido.substring(0, limit);
+                    const parcial = movsLevantamento.find(m => m.lote.substring(0, limit) === inputPrefix);
+
+                    if (parcial) {
+                        movimentoPendente = { equipaId, tipo, lote: parcial.lote, quantidade, formId: event.target };
+                        document.getElementById('modal-parcial-lote-nome').innerText = parcial.lote;
+                        document.getElementById('modal-lote-parcial').classList.remove('hidden');
+                        return;
+                    } else {
+                        alert(`ERRO: Este responsável não levantou nenhuma garrafa com o lote ${loteInserido} ou que corresponda parcialmente.`);
+                        return;
+                    }
+                }
+            }
+            abrirModalConfirmacaoMovimento(equipaId, tipo, loteInserido, quantidade, estadoAtual, event.target);
+        }
+
+        function confirmarLoteParcial() {
+            fecharModais();
+            const estadoAtual = calcularEstadoEquipa(movimentoPendente.equipaId, db.movimentos);
+            abrirModalConfirmacaoMovimento(movimentoPendente.equipaId, movimentoPendente.tipo, movimentoPendente.lote, movimentoPendente.quantidade, estadoAtual, movimentoPendente.formId);
+        }
+
+        function confirmarMovimento() {
+            if (!movimentoPendente) return;
+            db.movimentos.push({
+                equipaId: movimentoPendente.equipaId,
+                tipo: movimentoPendente.tipo,
+                lote: movimentoPendente.lote,
+                quantidade: movimentoPendente.quantidade,
+                data: movimentoPendente.data
+            });
+            guardarDB();
+            movimentoPendente.formId.reset();
+            fecharModais();
+            mudarAba('resumo');
+        }
+
+        function atualizarTabela() {
+            const tbody = document.getElementById('tabela-resumo');
+            tbody.innerHTML = '';
+            db.equipas.forEach(equipa => {
+                const estado = calcularEstadoEquipa(equipa.id, db.movimentos);
+                tbody.innerHTML += `
+                    <tr class="border-b transition">
+                        <td class="p-3 font-bold text-gray-800">${equipa.nome}</td>
+                        <td class="p-3 text-center text-amber-600 font-bold bg-amber-50 bg-opacity-50">${equipa.plafond}</td>
+                        <td class="p-3 text-center">${estado.levantadas}</td>
+                        <td class="p-3 text-center">${estado.devolvidas}</td>
+                        <td class="p-3 text-center font-bold text-lg">${estado.emFalta}</td>
+                        <td class="p-3 text-center font-bold text-red-600 bg-red-50 bg-opacity-50">${estado.caucaoPaga.toFixed(2)}€</td>
+                        <td class="p-3 text-center font-bold text-green-600 bg-green-50 bg-opacity-50">${estado.caucaoADevolver.toFixed(2)}€</td>
+                    </tr>
+                `;
+            });
+        }
+
+        function atualizarHistorico() {
+            const tbody = document.getElementById('tabela-historico');
+            tbody.innerHTML = '';
+            const filtroEquipa = document.getElementById('filtro-historico').value;
+            
+            let movsFiltrados = [...db.movimentos];
+            if (filtroEquipa) movsFiltrados = movsFiltrados.filter(m => m.equipaId.toString() === filtroEquipa);
+
+            const movimentosOrdenados = movsFiltrados.sort((a, b) => new Date(b.data) - new Date(a.data));
+            
+            if (movimentosOrdenados.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-gray-500 italic">Nenhum movimento encontrado.</td></tr>';
+                return;
+            }
+
+            movimentosOrdenados.forEach(mov => {
+                const equipa = db.equipas.find(e => e.id === mov.equipaId)?.nome || '<span class="text-red-500 italic">Apagado</span>';
+                const dataFormatada = new Date(mov.data).toLocaleString('pt-PT');
+                const badgeTipo = mov.tipo === 'levantamento' 
+                    ? '<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-bold uppercase tracking-wider">Levantamento</span>'
+                    : '<span class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-bold uppercase tracking-wider">Devolução</span>';
+                tbody.innerHTML += `
+                    <tr class="border-b transition">
+                        <td class="p-3 text-sm text-gray-500">${dataFormatada}</td>
+                        <td class="p-3 font-bold text-gray-800">${equipa}</td>
+                        <td class="p-3 text-center">${badgeTipo}</td>
+                        <td class="p-3 text-center"><span class="font-mono bg-gray-200 text-gray-800 px-2 py-1 rounded text-sm shadow-inner">${mov.lote}</span></td>
+                        <td class="p-3 text-center font-bold text-lg">${mov.quantidade}</td>
+                    </tr>
+                `;
+            });
+        }
+
+        function exportarExcel() {
+            let csvContent = "data:text/csv;charset=utf-8,\uFEFFData e Hora;Responsável;Tipo;Lote;Quantidade\n";
+            const movimentosOrdenados = [...db.movimentos].sort((a, b) => new Date(a.data) - new Date(a.data));
+            
+            movimentosOrdenados.forEach(mov => {
+                const equipa = db.equipas.find(e => e.id === mov.equipaId)?.nome || 'Apagado';
+                const data = new Date(mov.data).toLocaleString('pt-PT');
+                const tipoFormatado = mov.tipo === 'levantamento' ? 'Levantamento' : 'Devolução';
+                csvContent += `${data};${equipa};${tipoFormatado};${mov.lote};${mov.quantidade}\n`;
+            });
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "historico_garrafas_viagem_medieval.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // Exportar todas as funções necessárias para o `window` porque o `type="module"` 
+        // cria um escopo fechado que o HTML inline (onclick, onsubmit, etc) não deteta por omissão
+        window.mudarAba = mudarAba;
+        window.fecharModais = fecharModais;
+        window.abrirModalPassword = abrirModalPassword;
+        window.verificarPassword = verificarPassword;
+        window.toggleModoEscuro = toggleModoEscuro;
+        window.salvarConfigLote = salvarConfigLote;
+        window.adicionarEquipa = adicionarEquipa;
+        window.prepararEdicaoResponsavel = prepararEdicaoResponsavel;
+        window.salvarEdicaoResponsavelFinal = salvarEdicaoResponsavelFinal;
+        window.prepararRemocaoResponsavel = prepararRemocaoResponsavel;
+        window.confirmarRemocaoResponsavel = confirmarRemocaoResponsavel;
+        window.lerCSVImportacao = lerCSVImportacao;
+        window.confirmarImportacaoCSV = confirmarImportacaoCSV;
+        window.abrirLimparPasso1 = abrirLimparPasso1;
+        window.abrirLimparPasso2 = abrirLimparPasso2;
+        window.limparPasso1Exportar = limparPasso1Exportar;
+        window.confirmarLimpezaTotal = confirmarLimpezaTotal;
+        window.preRegistarMovimento = preRegistarMovimento;
+        window.confirmarLoteParcial = confirmarLoteParcial;
+        window.confirmarMovimento = confirmarMovimento;
+        window.atualizarHistorico = atualizarHistorico;
+        window.exportarExcel = exportarExcel;
+	window.fazerLogout = fazerLogout;
+
+    </script>
+</body>
+</html>
