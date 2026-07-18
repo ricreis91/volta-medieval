@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Sistema VOLTA</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-amber-50 h-screen flex items-center justify-center font-sans">
+
+    <div class="bg-white p-8 rounded-lg shadow-xl max-w-md w-full border-t-8 border-amber-700 text-center">
+        <!-- Logotipos -->
+        <div class="flex justify-center items-center gap-6 mb-8">
+            <img src="logotipo viagem medieval (2).jpg" alt="Viagem Medieval" class="h-40 object-contain">
+            <img src="logo-volta.jpg" alt="VOLTA" class="h-28 object-contain rounded-full">
+        </div>
+
+        <h1 class="text-2xl font-bold text-gray-800 mb-6 uppercase tracking-widest">Acesso ao Sistema</h1>
+
+        <form id="form-login" class="space-y-4">
+            <div>
+                <input type="text" id="user" placeholder="Utilizador" class="w-full p-3 border rounded focus:ring-2 focus:ring-amber-500 outline-none text-center" required>
+            </div>
+            <div>
+                <input type="password" id="pass" placeholder="Palavra-passe" class="w-full p-3 border rounded focus:ring-2 focus:ring-amber-500 outline-none text-center" required>
+            </div>
+            <p id="erro-login" class="text-red-500 text-sm font-bold hidden">Credenciais incorretas!</p>
+            <button type="submit" class="w-full bg-amber-700 text-white p-3 rounded font-bold hover:bg-amber-800 transition shadow-lg mt-4">Entrar no VOLTA</button>
+        </form>
+    </div>
+
+    <script>
+        document.getElementById('form-login').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const user = document.getElementById('user').value;
+            const pass = document.getElementById('pass').value;
+
+            // Credenciais solicitadas
+            if (user === 'user' && pass === 'medieval') {
+                // Guarda uma "chave" temporária no browser a dizer que está autenticado
+                sessionStorage.setItem('autenticadoVolta', 'true');
+                window.location.href = 'volta.html';
+            } else {
+                document.getElementById('erro-login').classList.remove('hidden');
+                document.getElementById('pass').value = '';
+            }
+        });
+    </script>
+</body>
+</html>
