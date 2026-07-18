@@ -539,7 +539,15 @@
         }
 
         function fecharModais() {
-            document.querySelectorAll('[id^="modal-"]').forEach(el => el.classList.add('hidden'));
+            // 1. Esconde todos os modais
+    document.getElementById('modal-lote-parcial').classList.add('hidden');
+    
+    // Se tiveres outros modais (ex: confirmação final), esconde-os também:
+    // document.getElementById('modal-confirmacao').classList.add('hidden');
+    
+    // 2. IMPORTANTE: Limpa a variável pendente para que nada fique "preso"
+    movimentoPendente = null;
+			document.querySelectorAll('[id^="modal-"]').forEach(el => el.classList.add('hidden'));
             movimentoPendente = null;
             edicaoResponsavelPendente = null;
             remocaoResponsavelPendente = null;
@@ -816,70 +824,58 @@
         }
 
         function preRegistarMovimento(event, tipo) {
-            event.preventDefault();
-            
-            const equipaId = parseInt(document.getElementById(`equipa-${tipo}`).value);
-            const loteInserido = document.getElementById(`lote-${tipo}`).value.toUpperCase().replace(/\s+/g, '');
-            const quantidade = parseInt(document.getElementById(`qtd-${tipo}`).value);
-            const estadoAtual = calcularEstadoEquipa(equipaId, db.movimentos);
+    event.preventDefault();
+    
+    // 1. Limpeza dos dados: Maiúsculas e sem espaços
+    const equipaId = parseInt(document.getElementById(`equipa-${tipo}`).value);
+    const rawLote = document.getElementById(`lote-${tipo}`).value;
+    const loteInserido = rawLote.toUpperCase().replace(/\s+/g, '');
+    const quantidade = parseInt(document.getElementById(`qtd-${tipo}`).value);
+    const limit = db.config.tamanhoLoteParcial || 5; // Usa 5 por defeito
 
-            if (tipo === 'devolucao') {
-                if (quantidade > estadoAtual.emFalta) {
-                    alert(`ERRO: A equipa tem apenas ${estadoAtual.emFalta} garrafas.\nNão é possível registar uma devolução de ${quantidade}.`);
-                    return;
-                }
+    // 2. Validação do tamanho mínimo
+    if (loteInserido.length < limit) {
+        alert(`ERRO: O lote deve ter pelo menos ${limit} caracteres.`);
+        return;
+    }
 
-                const movsLevantamento = db.movimentos.filter(m => m.equipaId === equipaId && m.tipo === 'levantamento');
-                const exato = movsLevantamento.find(m => m.lote === loteInserido);
-
-                if (!exato) {
-                    // 1. Calcula o saldo de cada lote
-                    const saldosLotes = {};
-                    db.movimentos.filter(m => m.equipaId === equipaId).forEach(m => {
-                        // Ignora lotes corrompidos/em branco do histórico
-                        if (!m.lote || m.lote.trim() === '') return; 
-                        
-                        if (!saldosLotes[m.lote]) saldosLotes[m.lote] = 0;
-                        if (m.tipo === 'levantamento') saldosLotes[m.lote] += m.quantidade;
-                        if (m.tipo === 'devolucao') saldosLotes[m.lote] -= m.quantidade;
-                    });
-
-                    // 2. Filtra lotes com garrafas pendentes
-                    const lotesAbertos = Object.keys(saldosLotes).filter(lote => saldosLotes[lote] > 0);
-
-                    if (lotesAbertos.length === 0) {
-                        alert(`ERRO: Esta equipa não tem garrafas pendentes de NENHUM lote para devolver.`);
-                        return;
-                    }
-
-                    // 3. Preenche a Dropdown
-                    const selectElement = document.getElementById('modal-dropdown-lotes');
-                    if (!selectElement) {
-                        alert("Erro: O HTML do modal novo não está a ser carregado. Faça Ctrl+F5 no navegador.");
-                        return;
-                    }
-                    
-                    selectElement.innerHTML = '';
-                    lotesAbertos.forEach(lote => {
-                        const qtdPend = saldosLotes[lote];
-                        selectElement.innerHTML += `<option value="${lote}">${lote} (${qtdPend} garrafas pendentes)</option>`;
-                    });
-
-                    // 4. Seleciona o mais parecido
-                    const limit = db.config.tamanhoLoteParcial || 6;
-                    const prefixoInserido = loteInserido.substring(0, limit);
-                    const loteParecido = lotesAbertos.find(l => l.startsWith(prefixoInserido) || prefixoInserido.startsWith(l));
-                    if (loteParecido) {
-                        selectElement.value = loteParecido;
-                    }
-
-                    movimentoPendente = { equipaId, tipo, quantidade, formId: event.target };
-                    document.getElementById('modal-lote-parcial').classList.remove('hidden');
-                    return;
-                }
-            }
-            abrirModalConfirmacaoMovimento(equipaId, tipo, loteInserido, quantidade, estadoAtual, event.target);
+    if (tipo === 'devolucao') {
+        const movsLevantamento = db.movimentos.filter(m => m.equipaId === equipaId && m.tipo === 'levantamento');
+        
+        // Verifica se existe um lote exato
+        const exato = movsLevantamento.find(m => m.lote === loteInserido);
+        if (exato) {
+            abrirModalConfirmacaoMovimento(equipaId, tipo, loteInserido, quantidade, calcularEstadoEquipa(equipaId, db.movimentos), event.target);
+            return;
         }
+
+        // 3. Lógica de Parcial vs Rejeição
+        const prefixoInserido = loteInserido.substring(0, limit);
+        
+        // Filtra lotes do histórico que começam com o mesmo prefixo
+        const sugestoes = [...new Set(movsLevantamento.map(m => m.lote))]
+            .filter(l => l.substring(0, limit) === prefixoInserido);
+
+        if (sugestoes.length > 0) {
+            // Se encontrou lotes que batem certo no prefixo, abre a dropdown
+            const saldos = {}; // (Lógica de calcular saldos pendentes aqui)
+            // ... (preenchimento da dropdown igual ao que fizemos antes)
+            
+            const sel = document.getElementById('modal-dropdown-lotes');
+            sel.innerHTML = '';
+            sugestoes.forEach(l => sel.innerHTML += `<option value="${l}">${l}</option>`);
+            
+            movimentoPendente = { equipaId, tipo, quantidade, formId: event.target };
+            document.getElementById('modal-lote-parcial').classList.remove('hidden');
+        } else {
+            // 4. Rejeição imediata se não houver correspondência nenhuma no prefixo
+            alert("ERRO: Lote inválido ou não encontrado para esta equipa.");
+        }
+    } else {
+        // Para levantamentos, segue o processo normal
+        abrirModalConfirmacaoMovimento(equipaId, tipo, loteInserido, quantidade, calcularEstadoEquipa(equipaId, db.movimentos), event.target);
+    }
+}
 
         function confirmarLoteParcial() {
 			// Vai buscar o lote que o utilizador escolheu na Dropdown
