@@ -827,10 +827,17 @@
                 const exato = movsLevantamento.find(m => m.lote === loteInserido);
 
                 if (!exato) {
-                    const limit = db.config.tamanhoLoteParcial;
-                    const inputPrefix = loteInserido.substring(0, limit);
-                    const parcial = movsLevantamento.find(m => m.lote.substring(0, limit) === inputPrefix);
-
+                   const limit = db.config.tamanhoLoteParcial || 6;
+const parcial = movsLevantamento.find(m => {
+    // Ignora lotes em branco que possam estar no histórico (evita o "campo vazio")
+    if (!m.lote || m.lote.trim() === '') return false;
+    
+    const prefixoGuardado = m.lote.substring(0, limit);
+    const prefixoInserido = loteInserido.substring(0, limit);
+    
+    // Compara se um começa com o outro (resolve o problema de LT123 vs LT12345)
+    return prefixoGuardado.startsWith(prefixoInserido) || prefixoInserido.startsWith(prefixoGuardado);
+});
                     if (parcial) {
                         movimentoPendente = { equipaId, tipo, lote: parcial.lote, quantidade, formId: event.target };
                         document.getElementById('modal-parcial-lote-nome').innerText = parcial.lote;
@@ -846,10 +853,13 @@
         }
 
         function confirmarLoteParcial() {
+			// 1. Guarda os dados numa variável temporária ANTES de limpar os modais
+    const pendente = { ...movimentoPendente };
             fecharModais();
-            const estadoAtual = calcularEstadoEquipa(movimentoPendente.equipaId, db.movimentos);
-            abrirModalConfirmacaoMovimento(movimentoPendente.equipaId, movimentoPendente.tipo, movimentoPendente.lote, movimentoPendente.quantidade, estadoAtual, movimentoPendente.formId);
-        }
+            // 3. Usa os dados guardados ('pendente' em vez de 'movimentoPendente')
+    const estadoAtual = calcularEstadoEquipa(pendente.equipaId, db.movimentos);
+    abrirModalConfirmacaoMovimento(pendente.equipaId, pendente.tipo, pendente.lote, pendente.quantidade, estadoAtual, pendente.formId);
+}
 
         function confirmarMovimento() {
             if (!movimentoPendente) return;
