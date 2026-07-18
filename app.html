@@ -516,12 +516,19 @@
         });
 
         // Função para Escrever na Base de Dados do Firebase (Substitui LocalStorage)
-        function guardarDB() {
-            set(ref(database, 'voltaDB'), db).catch((error) => {
-                console.error("Erro ao guardar na base de dados:", error);
-                alert("Erro ao guardar os dados. Verifique a sua ligação.");
-            });
-        }
+    function guardarDB() {
+    try {
+        // Garante que a base de dados não tem valores 'undefined' ou 'null' antes de salvar
+        const dbLimpa = JSON.stringify(db, (key, value) => {
+            return (value === undefined || value === null) ? "" : value;
+        });
+        localStorage.setItem('dados_volta', dbLimpa);
+        console.log("Dados guardados com sucesso!");
+    } catch (e) {
+        console.error("Erro fatal ao guardar base de dados:", e);
+        alert("Erro ao guardar dados. O formato pode estar inválido.");
+    }
+}
 
         let modoEscuroAtivo = localStorage.getItem('voltaTemaEscuro') === 'true';
         if (modoEscuroAtivo) aplicarModoEscuroVisual();
